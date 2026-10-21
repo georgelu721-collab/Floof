@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { fileToDataUrl } from "@/lib/image";
@@ -43,6 +44,12 @@ export default function NewStory() {
         </button>
         <p className="font-display text-lg font-semibold">New story</p>
         <span className="w-6" />
+      </div>
+      <div className="mx-4 mb-3 grid grid-cols-2 rounded-full bg-white/10 p-1 text-sm font-extrabold">
+        <Link href="/create" replace className="py-2 text-center text-white/60">
+          📸 Post
+        </Link>
+        <span className="rounded-full bg-white/90 py-2 text-center text-cocoa">⏳ Story</span>
       </div>
 
       <div className="relative mx-4 flex-1 overflow-hidden rounded-3xl" style={{ background: image ? "#000" : bg }}>

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
 import { MOMENT_TYPES } from "@/lib/data";
@@ -145,6 +147,12 @@ function CreateInner() {
     <main className="pb-10">
       <TopBar title="Create a Floof" />
       <div className="px-4">
+        <div className="mb-3 grid grid-cols-2 rounded-full bg-sand p-1 text-sm font-extrabold">
+          <span className="rounded-full bg-paper py-2 text-center shadow-sm">📸 Post</span>
+          <Link href="/story/new" replace className="py-2 text-center text-muted">
+            ⏳ Story
+          </Link>
+        </div>
         {dailyPrompt && (
           <div className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FFE9D2] to-[#FDE4E8] px-4 py-3">
             <span className="text-3xl">{dailyPrompt.emoji}</span>
