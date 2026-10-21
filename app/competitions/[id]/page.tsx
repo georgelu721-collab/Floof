@@ -35,7 +35,7 @@ export default function CompetitionPage() {
     <Page>
       <TopBar title={c.title} sub={`Sponsored by ${c.sponsor}`} />
       <div className="relative mx-4 h-52 overflow-hidden rounded-3xl">
-        <PetScene pet={hero} scene={c.scene} accessory={c.accessory} className="absolute inset-0 h-full w-full" />
+        <PetScene usePhoto pet={hero} scene={c.scene} accessory={c.accessory} className="absolute inset-0 h-full w-full" />
         <span className="absolute left-3 top-3 rounded-full bg-paper px-3 py-1 text-xs font-extrabold capitalize">{c.status}</span>
       </div>
       <section className="px-4 pt-4">

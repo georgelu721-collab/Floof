@@ -51,7 +51,7 @@ export default function Compete() {
           const hero = pet(c.heroPetId)!;
           return (
             <Link key={c.id} href={`/competitions/${c.id}`} className="relative block h-40 overflow-hidden rounded-3xl">
-              <PetScene pet={hero} scene={c.scene} accessory={c.accessory} className="absolute inset-0 h-full w-full" />
+              <PetScene usePhoto pet={hero} scene={c.scene} accessory={c.accessory} className="absolute inset-0 h-full w-full" />
               <div className="absolute inset-0 bg-gradient-to-r from-cocoa/85 via-cocoa/50 to-transparent" />
               <div className="relative flex h-full max-w-[65%] flex-col justify-center p-5 text-white">
                 <h3 className="font-display text-xl font-semibold leading-tight">{c.title}</h3>
@@ -79,7 +79,7 @@ export default function Compete() {
           const hero = pet(m.heroPetId)!;
           return (
             <Link key={m.id} href={`/meetups/${m.id}`} className="card flex items-center gap-3 p-3">
-              <PetScene pet={hero} scene={m.scene} className="h-16 w-16 shrink-0 rounded-2xl" />
+              <PetScene usePhoto pet={hero} scene={m.scene} className="h-16 w-16 shrink-0 rounded-2xl" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-extrabold">{m.title}</p>
                 <p className="flex items-center gap-1 text-xs font-semibold text-muted">

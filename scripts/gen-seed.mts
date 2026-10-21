@@ -24,17 +24,21 @@ const out: string[] = [
 
 for (const p of PETS) {
   out.push(
-    `insert into public.pets (id, owner_id, handle, name, species, breed, age, city, bio, look, bg, clan, verified, followers_base, following_base, biscuits_base, paw_score_base)
-values (${[p.id, null, p.handle, p.name, p.species, p.breed, p.age, p.city, p.bio, p.look, p.bg, p.clan, !!p.verified, p.followers, p.following, p.biscuitsReceived, p.pawScore].map(q).join(", ")})
-on conflict (id) do update set look = excluded.look, bio = excluded.bio, followers_base = excluded.followers_base, biscuits_base = excluded.biscuits_base, paw_score_base = excluded.paw_score_base;`,
+    `insert into public.pets (id, owner_id, handle, name, species, breed, age, city, bio, look, photo_url, bg, clan, verified, followers_base, following_base, biscuits_base, paw_score_base)
+values (${[p.id, null, p.handle, p.name, p.species, p.breed, p.age, p.city, p.bio, p.look, p.photo, p.bg, p.clan, !!p.verified, p.followers, p.following, p.biscuitsReceived, p.pawScore].map(q).join(", ")})
+on conflict (id) do update set handle = excluded.handle, breed = excluded.breed, look = excluded.look, bio = excluded.bio, photo_url = excluded.photo_url,
+  followers_base = excluded.followers_base, biscuits_base = excluded.biscuits_base, paw_score_base = excluded.paw_score_base
+  where public.pets.owner_id is null;`,
   );
 }
 out.push("");
 for (const x of POSTS) {
   out.push(
-    `insert into public.posts (id, pet_id, scene, accessory, expression, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values (${[x.id, x.petId, x.scene, x.accessory, x.expression, x.overlay, x.caption, x.tags, x.location, x.moment, x.slides].map(q).join(", ")}, ${x.boops}, ${x.biscuits}, ${Math.max(0, x.commentCount - x.comments.length)}, now() - ${interval(x.ago)})
-on conflict (id) do nothing;`,
+    `insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values (${[x.id, x.petId, x.scene, x.accessory, x.expression, x.image, x.overlay, x.caption, x.tags, x.location, x.moment, x.slides].map(q).join(", ")}, ${x.boops}, ${x.biscuits}, ${Math.max(0, x.commentCount - x.comments.length)}, now() - ${interval(x.ago)})
+on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+  location = excluded.location, moment = excluded.moment
+  where public.posts.pet_id in (select id from public.pets where owner_id is null);`,
   );
   for (const c of x.comments) {
     out.push(

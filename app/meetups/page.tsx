@@ -73,7 +73,7 @@ export default function Meetups() {
           return (
             <div key={m.id} className="card flex gap-3 p-3">
               <Link href={`/meetups/${m.id}`} className="shrink-0">
-                <PetScene pet={hero} scene={m.scene} className="h-24 w-24 rounded-2xl" />
+                <PetScene usePhoto pet={hero} scene={m.scene} className="h-24 w-24 rounded-2xl" />
               </Link>
               <div className="min-w-0 flex-1">
                 <Link href={`/meetups/${m.id}`}>

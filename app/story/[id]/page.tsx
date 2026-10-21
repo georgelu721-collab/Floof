@@ -40,7 +40,7 @@ export default function Story() {
 
   return (
     <main className="fixed inset-0 z-50 mx-auto max-w-[440px] bg-[#2B1B15] text-white">
-      <div className="absolute inset-x-0 top-0 z-10 space-y-3 p-4 pt-[max(env(safe-area-inset-top),14px)]">
+      <div className="absolute inset-x-0 top-0 z-10 space-y-3 bg-gradient-to-b from-black/55 to-transparent p-4 pb-8 pt-[max(env(safe-area-inset-top),14px)]">
         <div className="flex gap-1">
           {items.map((_, k) => (
             <div key={k} className="h-1 flex-1 overflow-hidden rounded-full bg-white/30">

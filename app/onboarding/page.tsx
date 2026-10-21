@@ -171,7 +171,7 @@ export default function Onboarding() {
       {step === 1 && (
         <section className="space-y-4 px-6 pt-6">
           <Field label="Username" hint={handleTaken ? "That username is taken" : `floof.app/@${finalHandle}`}>
-            <input className="input" value={handle || autoHandle} onChange={(e) => setHandle(e.target.value)} placeholder="mochi.the.bichon" />
+            <input className="input" value={handle || autoHandle} onChange={(e) => setHandle(e.target.value)} placeholder="mochi.the.samoyed" />
           </Field>
           <Field label="Breed">
             <input className="input" value={breed} onChange={(e) => setBreed(e.target.value)} placeholder="e.g. Bichon Frise" />

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:seed": "node --experimental-strip-types scripts/gen-seed.mts && cat supabase/migrations/0001_floof_schema.sql supabase/seed.sql > supabase/setup.sql"
+    "db:seed": "node --experimental-strip-types scripts/gen-seed.mts && (printf -- '-- Floof: full Supabase setup (schema + starter content).\\n-- Paste this whole file into Supabase → SQL Editor → New query → Run. Safe to run again.\\n\\n'; cat supabase/migrations/0001_floof_schema.sql supabase/seed.sql) > supabase/setup.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

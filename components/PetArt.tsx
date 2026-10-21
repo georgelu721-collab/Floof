@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { Accessory, Expression, Pet, Scene } from "@/lib/types";
 
 const INK = "#4A2E22";
@@ -298,12 +298,18 @@ export function PetAvatar({
         : ring === "me"
           ? "p-[2px] bg-[#F08A9B]"
           : "";
+  return <AvatarInner pet={pet} size={size} cls={`${ringCls} ${className}`} />;
+}
+
+function AvatarInner({ pet, size, cls }: { pet: Pet; size: number; cls: string }) {
+  const [broken, setBroken] = useState<string | null>(null);
+  const showPhoto = pet.photo && broken !== pet.photo;
   return (
-    <span className={`inline-block shrink-0 rounded-full ${ringCls} ${className}`} style={{ width: size, height: size }}>
+    <span className={`inline-block shrink-0 rounded-full ${cls}`} style={{ width: size, height: size }}>
       <span className="block h-full w-full overflow-hidden rounded-full border-2 border-paper" style={{ background: pet.bg }}>
-        {pet.photo ? (
+        {showPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={pet.photo} alt={pet.name} className="h-full w-full object-cover" />
+          <img src={pet.photo} alt={pet.name} loading="lazy" onError={() => setBroken(pet.photo ?? null)} className="h-full w-full object-cover" />
         ) : (
           <svg viewBox="22 30 156 156" className="h-full w-full" role="img" aria-label={pet.name}>
             <Head pet={pet} expression="smile" />
@@ -506,14 +512,22 @@ export function PetScene({
   accessory = "none",
   expression = "happy",
   className = "",
+  usePhoto = false,
 }: {
   pet: Pet;
   scene: Scene;
   accessory?: Accessory;
   expression?: Expression;
   className?: string;
+  /** Show the pet's real photo instead of the drawing when it has one. */
+  usePhoto?: boolean;
 }) {
   const id = useId().replace(/:/g, "");
+  const [broken, setBroken] = useState(false);
+  if (usePhoto && pet.photo && !broken) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={pet.photo} alt={pet.name} loading="lazy" onError={() => setBroken(true)} className={`object-cover ${className}`} />;
+  }
   const fur = pet.look.fur;
   return (
     <svg viewBox="0 0 400 400" className={className} role="img" aria-label={`${pet.name} illustration`} preserveAspectRatio="xMidYMid slice">
@@ -542,11 +556,12 @@ export function PostMedia({
   pet: Pet;
   className?: string;
 }) {
+  const [broken, setBroken] = useState<string | null>(null);
   return (
     <div className={`relative overflow-hidden bg-sand ${className}`}>
-      {post.image ? (
+      {post.image && broken !== post.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={post.image} alt="" loading="lazy" onError={() => setBroken(post.image ?? null)} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <PetScene pet={pet} scene={post.scene} accessory={post.accessory} expression={post.expression} className="absolute inset-0 h-full w-full" />
       )}

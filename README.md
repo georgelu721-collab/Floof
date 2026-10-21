@@ -18,7 +18,7 @@
 
 - [Next.js](https://nextjs.org) (App Router) + React + TypeScript, Tailwind CSS v4
 - [Supabase](https://supabase.com) backend: Postgres database, email logins, photo storage and live messages
-- Pets are drawn as SVG illustrations in the logo's style; real photos can be uploaded too
+- Starter pets use real photos from [Unsplash](https://unsplash.com) (free under the Unsplash License), stored in `public/photos`. Drawn SVG versions are used as a fallback, and users can upload their own photos
 
 ## Backend setup (one time)
 

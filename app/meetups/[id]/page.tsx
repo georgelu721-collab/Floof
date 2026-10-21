@@ -29,7 +29,7 @@ export default function MeetupPage() {
   return (
     <Page>
       <div className="relative h-64">
-        <PetScene pet={hero} scene={m.scene} accessory="hat" className="absolute inset-0 h-full w-full" />
+        <PetScene usePhoto pet={hero} scene={m.scene} accessory="hat" className="absolute inset-0 h-full w-full" />
         <button
           onClick={() => (window.history.length > 1 ? router.back() : router.push("/meetups"))}
           className="absolute left-4 top-[max(env(safe-area-inset-top),14px)] rounded-full bg-paper/90 p-2 shadow"
