@@ -34,9 +34,9 @@ on conflict (id) do update set handle = excluded.handle, breed = excluded.breed,
 out.push("");
 for (const x of POSTS) {
   out.push(
-    `insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values (${[x.id, x.petId, x.scene, x.accessory, x.expression, x.image, x.overlay, x.caption, x.tags, x.location, x.moment, x.slides].map(q).join(", ")}, ${x.boops}, ${x.biscuits}, ${Math.max(0, x.commentCount - x.comments.length)}, now() - ${interval(x.ago)})
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+    `insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values (${[x.id, x.petId, x.scene, x.accessory, x.expression, x.image, x.images ?? (x.image ? [x.image] : []), x.overlay, x.caption, x.tags, x.location, x.moment, x.slides].map(q).join(", ")}, ${x.boops}, ${x.biscuits}, ${Math.max(0, x.commentCount - x.comments.length)}, now() - ${interval(x.ago)})
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);`,
   );

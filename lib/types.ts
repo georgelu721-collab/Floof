@@ -83,7 +83,8 @@ export type Post = {
   scene: Scene;
   accessory: Accessory;
   expression: Expression;
-  image?: string; // uploaded photo (data URL)
+  image?: string; // cover photo (URL or data URL)
+  images?: string[]; // all photos in order when there is more than one
   overlay?: string; // handwritten text on the photo
   caption: string;
   tags: string[];

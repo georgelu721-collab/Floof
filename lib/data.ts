@@ -297,8 +297,8 @@ export const POSTS: Post[] = [
     createdAt: 0,
     ago: "2h",
     moment: "first-haircut",
-    slides: 6,
     image: "/photos/post-p1.jpg",
+    images: ["/photos/post-p1.jpg", "/photos/post-p1-2.jpg"],
   },
   {
     id: "p2",
@@ -319,8 +319,8 @@ export const POSTS: Post[] = [
     createdAt: 0,
     ago: "5h",
     moment: "first-expo",
-    slides: 4,
     image: "/photos/post-p2.jpg",
+    images: ["/photos/post-p2.jpg", "/photos/post-p2-2.jpg", "/photos/post-p2-3.jpg"],
   },
   {
     id: "p3",
@@ -340,6 +340,7 @@ export const POSTS: Post[] = [
     ago: "7h",
     moment: "first-beach",
     image: "/photos/post-p3.jpg",
+    images: ["/photos/post-p3.jpg", "/photos/post-p3-2.jpg"],
   },
   {
     id: "p4",
@@ -531,6 +532,7 @@ export const POSTS: Post[] = [
     ago: "4d",
     moment: "first-expo",
     image: "/photos/post-p14.jpg",
+    images: ["/photos/post-p14.jpg", "/photos/post-p14-2.jpg", "/photos/post-p14-3.jpg"],
   },
   {
     id: "p15",

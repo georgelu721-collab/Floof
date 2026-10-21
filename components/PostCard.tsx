@@ -75,10 +75,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
       </header>
 
       <div className="relative mx-3 select-none" onClick={onMediaTap}>
-        <PostMedia post={post} pet={owner} className="aspect-square rounded-[1.6rem]" />
-        {post.slides && post.slides > 1 && (
-          <span className="absolute right-3 top-3 rounded-full bg-cocoa/70 px-2.5 py-0.5 text-xs font-bold text-white">1/{post.slides}</span>
-        )}
+        <PostMedia post={post} pet={owner} carousel className="aspect-square rounded-[1.6rem]" />
         {burst > 0 && (
           <span key={burst} className="animate-float-up pointer-events-none absolute left-1/2 top-1/2 -ml-10 -mt-10 text-white drop-shadow-lg">
             <PawIcon size={80} />

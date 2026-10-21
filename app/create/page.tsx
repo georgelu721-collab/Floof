@@ -10,6 +10,8 @@ import { PostMedia } from "@/components/PetArt";
 import { TopBar } from "@/components/Shell";
 import { IconImage, IconPin, PawIcon } from "@/components/Icons";
 
+const MAX_PHOTOS = 6;
+
 const SCENES: { id: Scene; label: string }[] = [
   { id: "park", label: "🌳 Park" },
   { id: "beach", label: "🏖️ Beach" },
@@ -48,7 +50,8 @@ function CreateInner() {
   const initialMoment = params.get("moment") as MomentType | null;
   const validMoment = initialMoment && initialMoment in MOMENT_TYPES ? initialMoment : null;
 
-  const [image, setImage] = useState<string | undefined>();
+  const [photos, setPhotos] = useState<string[]>([]);
+  const image = photos[0];
   const [scene, setScene] = useState<Scene>(validMoment ? MOMENT_TYPES[validMoment].scene : "park");
   const [accessory, setAccessory] = useState<Accessory>("bandana");
   const [expression, setExpression] = useState<Expression>("happy");
@@ -70,6 +73,7 @@ function CreateInner() {
         accessory,
         expression,
         image,
+        images: photos.length > 1 ? photos : undefined,
         overlay: overlay.trim() || undefined,
         caption: caption.trim() || "🐾",
         tags: tags
@@ -106,33 +110,55 @@ function CreateInner() {
     <main className="pb-10">
       <TopBar title="Create a Floof" />
       <div className="px-4">
-        <div className="relative">
-          <PostMedia post={{ scene, accessory, expression, image, overlay }} pet={me} className="aspect-square rounded-[1.6rem]" />
-          {image && (
-            <button onClick={() => setImage(undefined)} className="absolute right-3 top-3 rounded-full bg-cocoa/70 px-3 py-1 text-xs font-bold text-white">
-              Remove photo
-            </button>
-          )}
-        </div>
+        <PostMedia
+          post={{ scene, accessory, expression, image, images: photos, overlay }}
+          pet={me}
+          carousel
+          className="aspect-square rounded-[1.6rem]"
+        />
 
-        <label className="btn btn-soft mt-3 w-full cursor-pointer">
-          <IconImage size={18} /> {busy ? "Processing…" : image ? "Change photo" : "Upload a real photo"}
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              setBusy(true);
-              try {
-                setImage(await fileToDataUrl(f));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        </label>
+        {photos.length > 0 && (
+          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
+            {photos.map((src, i) => (
+              <div key={i} className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-xl object-cover" />
+                <button
+                  onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-cocoa text-xs font-bold text-white"
+                  aria-label={`Remove photo ${i + 1}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {photos.length < MAX_PHOTOS && (
+          <label className="btn btn-soft mt-3 w-full cursor-pointer">
+            <IconImage size={18} />{" "}
+            {busy ? "Processing…" : photos.length ? `Add more photos (${photos.length}/${MAX_PHOTOS})` : `Upload photos (up to ${MAX_PHOTOS})`}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS - photos.length);
+                e.target.value = "";
+                if (!files.length) return;
+                setBusy(true);
+                try {
+                  const urls = await Promise.all(files.map((f) => fileToDataUrl(f)));
+                  setPhotos((ps) => [...ps, ...urls].slice(0, MAX_PHOTOS));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </label>
+        )}
 
         {!image && (
           <div className="mt-4 space-y-3">

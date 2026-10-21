@@ -361,7 +361,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(KEY, JSON.stringify(s));
     } catch {
       try {
-        const slim = { ...s, myPosts: s.myPosts.map((p, i) => (i < 3 ? p : { ...p, image: undefined })) };
+        const slim = { ...s, myPosts: s.myPosts.map((p, i) => (i < 3 ? p : { ...p, image: undefined, images: undefined })) };
         localStorage.setItem(KEY, JSON.stringify(slim));
       } catch {
         /* give up quietly */

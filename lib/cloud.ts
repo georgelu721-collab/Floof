@@ -35,6 +35,7 @@ type PostRow = {
   accessory: Post["accessory"];
   expression: Post["expression"];
   image_url: string | null;
+  image_urls: string[] | null;
   overlay: string | null;
   caption: string;
   tags: string[];
@@ -233,6 +234,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     accessory: r.accessory,
     expression: r.expression,
     image: r.image_url ?? undefined,
+    images: r.image_urls && r.image_urls.length > 1 ? r.image_urls : undefined,
     overlay: r.overlay ?? undefined,
     caption: r.caption,
     tags: r.tags ?? [],
@@ -325,7 +327,9 @@ export const remote = {
     check(await sb().from("comments").insert({ post_id: postId, pet_id: petId, text }));
   },
   async post(p: Post) {
-    const image = p.image?.startsWith("data:") ? await uploadPhoto(p.image, "post") : p.image;
+    const all = p.images?.length ? p.images : p.image ? [p.image] : [];
+    const urls = await Promise.all(all.map((src, i) => (src.startsWith("data:") ? uploadPhoto(src, `post-${i + 1}`) : Promise.resolve(src))));
+    const image = urls[0];
     check(
       await sb().from("posts").insert({
         id: p.id,
@@ -334,6 +338,7 @@ export const remote = {
         accessory: p.accessory,
         expression: p.expression,
         image_url: image ?? null,
+        image_urls: urls,
         overlay: p.overlay ?? null,
         caption: p.caption,
         tags: p.tags,

@@ -51,6 +51,11 @@ create table if not exists public.posts (
   comments_base int not null default 0,
   created_at timestamptz not null default now()
 );
+-- Added later: every photo of a post, in order (image_url is the cover).
+alter table public.posts add column if not exists image_urls text[] not null default '{}';
+alter table public.posts drop constraint if exists posts_image_urls_max;
+alter table public.posts add constraint posts_image_urls_max check (cardinality(image_urls) <= 6);
+
 create index if not exists posts_created_idx on public.posts (created_at desc);
 create index if not exists posts_pet_idx on public.posts (pet_id);
 
@@ -293,7 +298,9 @@ select
   (select count(*) from public.posts x where x.pet_id = p.id)::int as post_count
 from public.pets p;
 
-create or replace view public.post_feed with (security_invoker = true) as
+-- Recreated (not replaced) because its column list changes when posts gains columns.
+drop view if exists public.post_feed;
+create view public.post_feed with (security_invoker = true) as
 select
   x.*,
   x.boops_base + (select count(*) from public.boops b where b.post_id = x.id)::int as boop_count,

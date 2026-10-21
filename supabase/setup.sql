@@ -54,6 +54,11 @@ create table if not exists public.posts (
   comments_base int not null default 0,
   created_at timestamptz not null default now()
 );
+-- Added later: every photo of a post, in order (image_url is the cover).
+alter table public.posts add column if not exists image_urls text[] not null default '{}';
+alter table public.posts drop constraint if exists posts_image_urls_max;
+alter table public.posts add constraint posts_image_urls_max check (cardinality(image_urls) <= 6);
+
 create index if not exists posts_created_idx on public.posts (created_at desc);
 create index if not exists posts_pet_idx on public.posts (pet_id);
 
@@ -296,7 +301,9 @@ select
   (select count(*) from public.posts x where x.pet_id = p.id)::int as post_count
 from public.pets p;
 
-create or replace view public.post_feed with (security_invoker = true) as
+-- Recreated (not replaced) because its column list changes when posts gains columns.
+drop view if exists public.post_feed;
+create view public.post_feed with (security_invoker = true) as
 select
   x.*,
   x.boops_base + (select count(*) from public.boops b where b.post_id = x.id)::int as boop_count,
@@ -582,115 +589,115 @@ on conflict (id) do update set handle = excluded.handle, breed = excluded.breed,
   followers_base = excluded.followers_base, biscuits_base = excluded.biscuits_base, paw_score_base = excluded.paw_score_base
   where public.pets.owner_id is null;
 
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p1', 'mochi', 'salon', 'bow', 'happy', '/photos/post-p1.jpg', 'first haircut ♡', 'First haircut! ✂️🎀 Looking fresh for the weekend 😎', array['firstmoment', 'samoyed', 'glowup']::text[], 'Sydney, Australia', 'first-haircut', 6, 12400, 180, 317, now() - interval '2 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p1', 'mochi', 'salon', 'bow', 'happy', '/photos/post-p1.jpg', array['/photos/post-p1.jpg', '/photos/post-p1-2.jpg']::text[], 'first haircut ♡', 'First haircut! ✂️🎀 Looking fresh for the weekend 😎', array['firstmoment', 'samoyed', 'glowup']::text[], 'Sydney, Australia', 'first-haircut', null, 12400, 180, 317, now() - interval '2 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '2c4b0c2b-532a-474f-8c86-8cfb07a58ff6'::uuid, 'p1', 'luna', 'So cute!! I would never let them do this to me', 14, now() - interval '3 hours'
+select 'c81b8449-9591-4b5e-9010-beb418691312'::uuid, 'p1', 'luna', 'So cute!! I would never let them do this to me', 14, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'luna' and text = 'So cute!! I would never let them do this to me');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '2fb3614c-c5d3-49b6-bf0e-b7013dac0d5a'::uuid, 'p1', 'ollie', 'Happiness in a photo 🥹', 8, now() - interval '2 hours'
+select 'b90be92a-96d0-4ef4-91da-4ede1f2ee508'::uuid, 'p1', 'ollie', 'Happiness in a photo 🥹', 8, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'ollie' and text = 'Happiness in a photo 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ad6a1f3c-e09f-46ee-9566-3500001e4542'::uuid, 'p1', 'biscuit', 'Hair goals tbh', 5, now() - interval '1 hours'
+select '8ce264fc-ca3a-452e-8635-903d220db202'::uuid, 'p1', 'biscuit', 'Hair goals tbh', 5, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'biscuit' and text = 'Hair goals tbh');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p2', 'biscuit', 'expo', 'bandana', 'happy', '/photos/post-p2.jpg', null, 'First time at the Pet Expo! Made a new bestie 😍', array['PetExpo', 'GoodBoy', 'FloofLife']::text[], 'Sydney Showground', 'first-expo', 4, 28700, 420, 630, now() - interval '5 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p2', 'biscuit', 'expo', 'bandana', 'happy', '/photos/post-p2.jpg', array['/photos/post-p2.jpg', '/photos/post-p2-2.jpg', '/photos/post-p2-3.jpg']::text[], null, 'First time at the Pet Expo! Made a new bestie 😍', array['PetExpo', 'GoodBoy', 'FloofLife']::text[], 'Sydney Showground', 'first-expo', null, 28700, 420, 630, now() - interval '5 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'dfceb06a-08a1-46b1-9660-25a62e1646d1'::uuid, 'p2', 'toby', 'Was that you at the treat stand?? 👀', 22, now() - interval '5 hours'
+select 'a3504bdc-9121-4d3d-b857-69c045611a46'::uuid, 'p2', 'toby', 'Was that you at the treat stand?? 👀', 22, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'toby' and text = 'Was that you at the treat stand?? 👀');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '88cf1ced-dd17-4fa4-a1d5-faec50df5e29'::uuid, 'p2', 'mochi', 'See you next year bestie!', 17, now() - interval '4 hours'
+select 'ce25af78-3d76-472a-a587-7fa1e310cc78'::uuid, 'p2', 'mochi', 'See you next year bestie!', 17, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'mochi' and text = 'See you next year bestie!');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p3', 'toby', 'beach', 'none', 'happy', '/photos/post-p3.jpg', 'first time at the beach!', 'First swim of the season! 🌊 Wouldn''t have it any other way 💙', array['firstmoment', 'beachday', 'goodboy']::text[], 'Bondi Beach', 'first-beach', null, 1200, 12, 47, now() - interval '7 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p3', 'toby', 'beach', 'none', 'happy', '/photos/post-p3.jpg', array['/photos/post-p3.jpg', '/photos/post-p3-2.jpg']::text[], 'first time at the beach!', 'First swim of the season! 🌊 Wouldn''t have it any other way 💙', array['firstmoment', 'beachday', 'goodboy']::text[], 'Bondi Beach', 'first-beach', null, 1200, 12, 47, now() - interval '7 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '0a6da4f8-1211-4a36-9d87-597b6a5162c6'::uuid, 'p3', 'rex', 'I''ll stick to the sand thanks', 3, now() - interval '6 hours'
+select '9e87065b-25e9-4a23-b2b5-1b4695f863b6'::uuid, 'p3', 'rex', 'I''ll stick to the sand thanks', 3, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'rex' and text = 'I''ll stick to the sand thanks');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p4', 'luna', 'night', 'none', 'sleepy', '/photos/post-p4.jpg', null, 'Do not disturb. Ever. 😎', array['catnap', 'sleepy']::text[], 'Sydney, Australia', null, null, 9800, 96, 210, now() - interval '9 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p4', 'luna', 'night', 'none', 'sleepy', '/photos/post-p4.jpg', array['/photos/post-p4.jpg']::text[], null, 'Do not disturb. Ever. 😎', array['catnap', 'sleepy']::text[], 'Sydney, Australia', null, null, 9800, 96, 210, now() - interval '9 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '46a989d8-2abd-4473-afe4-d0af2d8296d1'::uuid, 'p4', 'pepper', 'Respect.', 30, now() - interval '1 hours'
+select '43c39244-9c38-4c13-bf1d-ad77dd5960cf'::uuid, 'p4', 'pepper', 'Respect.', 30, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p4' and pet_id = 'pepper' and text = 'Respect.');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p5', 'mochi', 'blossom', 'flowers', 'happy', '/photos/post-p5.jpg', 'good day!!', 'Park zoomies 🌸 More walks, more sniffing, more happiness ♡', array['flooflife', 'samoyed', 'happydog', 'sunnyday']::text[], 'Royal Botanic Garden', null, null, 15200, 230, 94, now() - interval '12 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p5', 'mochi', 'blossom', 'flowers', 'happy', '/photos/post-p5.jpg', array['/photos/post-p5.jpg']::text[], 'good day!!', 'Park zoomies 🌸 More walks, more sniffing, more happiness ♡', array['flooflife', 'samoyed', 'happydog', 'sunnyday']::text[], 'Royal Botanic Garden', null, null, 15200, 230, 94, now() - interval '12 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c6f575ba-8b40-4ee3-b6b5-95fcf487d935'::uuid, 'p5', 'nala', 'Prettiest floof in the garden', 11, now() - interval '12 hours'
+select '5c14e1e6-7315-4a98-bbde-0525f4e4bccf'::uuid, 'p5', 'nala', 'Prettiest floof in the garden', 11, now() - interval '12 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'nala' and text = 'Prettiest floof in the garden');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p6', 'miso', 'cozy', 'none', 'smile', '/photos/post-p6.jpg', null, 'Found the one warm patch in the house ☀️', array['orangecat', 'sunbeam']::text[], 'Gold Coast', null, null, 6400, 44, 72, now() - interval '14 hours')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p6', 'miso', 'cozy', 'none', 'smile', '/photos/post-p6.jpg', array['/photos/post-p6.jpg']::text[], null, 'Found the one warm patch in the house ☀️', array['orangecat', 'sunbeam']::text[], 'Gold Coast', null, null, 6400, 44, 72, now() - interval '14 hours')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p7', 'bigmac', 'park', 'bandana', 'happy', '/photos/post-p7.jpg', null, 'Park zoomies with my bestie Mochi 🐾', array['zoomies', 'shiba', 'bestfriends']::text[], 'Centennial Park', 'first-park', null, 4200, 61, 57, now() - interval '1 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p7', 'bigmac', 'park', 'bandana', 'happy', '/photos/post-p7.jpg', array['/photos/post-p7.jpg']::text[], null, 'Park zoomies with my bestie Mochi 🐾', array['zoomies', 'shiba', 'bestfriends']::text[], 'Centennial Park', 'first-park', null, 4200, 61, 57, now() - interval '1 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '2b53f40d-0973-4504-b606-ee9363b96995'::uuid, 'p7', 'mochi', 'Best day ever!!', 19, now() - interval '1 days'
+select 'f49fac81-7a9e-4e7f-bea3-5c6ea7af590e'::uuid, 'p7', 'mochi', 'Best day ever!!', 19, now() - interval '1 days'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'mochi' and text = 'Best day ever!!');
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p8', 'nala', 'blossom', 'flowers', 'smile', '/photos/post-p8.jpg', null, 'Spring princess reporting for duty 🌼', array['ragdoll', 'spring']::text[], 'Brisbane', null, null, 7300, 81, 64, now() - interval '1 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p8', 'nala', 'blossom', 'flowers', 'smile', '/photos/post-p8.jpg', array['/photos/post-p8.jpg']::text[], null, 'Spring princess reporting for duty 🌼', array['ragdoll', 'spring']::text[], 'Brisbane', null, null, 7300, 81, 64, now() - interval '1 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p9', 'peanut', 'cozy', 'party', 'smile', '/photos/post-p9.jpg', '8 months old!', 'Celebrated with a sunflower seed cake 🎉', array['hamster', 'birthday']::text[], null, 'first-birthday', null, 2100, 33, 41, now() - interval '1 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p9', 'peanut', 'cozy', 'party', 'smile', '/photos/post-p9.jpg', array['/photos/post-p9.jpg']::text[], '8 months old!', 'Celebrated with a sunflower seed cake 🎉', array['hamster', 'birthday']::text[], null, 'first-birthday', null, 2100, 33, 41, now() - interval '1 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p10', 'ollie', 'vet', 'bandana', 'smile', '/photos/post-p10.jpg', 'brave boy', 'First vet visit — wore my disguise 😎🩺', array['firstmoment', 'chowchow']::text[], 'Perth', 'first-vet', null, 3100, 27, 30, now() - interval '2 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p10', 'ollie', 'vet', 'bandana', 'smile', '/photos/post-p10.jpg', array['/photos/post-p10.jpg']::text[], 'brave boy', 'First vet visit — wore my disguise 😎🩺', array['firstmoment', 'chowchow']::text[], 'Perth', 'first-vet', null, 3100, 27, 30, now() - interval '2 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p11', 'clover', 'park', 'flowers', 'smile', '/photos/post-p11.jpg', null, 'Binkies in the clover patch 🍀', array['bunny', 'binky']::text[], null, null, null, 5100, 52, 37, now() - interval '2 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p11', 'clover', 'park', 'flowers', 'smile', '/photos/post-p11.jpg', array['/photos/post-p11.jpg']::text[], null, 'Binkies in the clover patch 🍀', array['bunny', 'binky']::text[], null, null, null, 5100, 52, 37, now() - interval '2 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p12', 'rex', 'sunset', 'sunglasses', 'happy', '/photos/post-p12.jpg', null, 'New hoodie, who dis 😎', array['frenchie', 'ootd']::text[], null, null, null, 20400, 140, 420, now() - interval '2 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p12', 'rex', 'sunset', 'sunglasses', 'happy', '/photos/post-p12.jpg', array['/photos/post-p12.jpg']::text[], null, 'New hoodie, who dis 😎', array['frenchie', 'ootd']::text[], null, null, null, 20400, 140, 420, now() - interval '2 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p13', 'pepper', 'party', 'crown', 'wink', '/photos/post-p13.jpg', null, 'Gotcha Day #6. Exhausted from ruling this house 👑', array['tuxedocat', 'gotchaday']::text[], null, 'gotcha-day', null, 4800, 70, 52, now() - interval '3 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p13', 'pepper', 'party', 'crown', 'wink', '/photos/post-p13.jpg', array['/photos/post-p13.jpg']::text[], null, 'Gotcha Day #6. Exhausted from ruling this house 👑', array['tuxedocat', 'gotchaday']::text[], null, 'gotcha-day', null, 4800, 70, 52, now() - interval '3 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p14', 'bigmac', 'expo', 'hat', 'happy', '/photos/post-p14.jpg', null, 'Brought a flower to the Pet Expo 🌷 Treat stand: located.', array['PetExpo', 'goldenretriever']::text[], 'Sydney Showground', 'first-expo', null, 3900, 48, 40, now() - interval '4 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p14', 'bigmac', 'expo', 'hat', 'happy', '/photos/post-p14.jpg', array['/photos/post-p14.jpg', '/photos/post-p14-2.jpg', '/photos/post-p14-3.jpg']::text[], null, 'Brought a flower to the Pet Expo 🌷 Treat stand: located.', array['PetExpo', 'goldenretriever']::text[], 'Sydney Showground', 'first-expo', null, 3900, 48, 40, now() - interval '4 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p15', 'mochi', 'park', 'duck', 'happy', '/photos/post-p15.jpg', null, 'Puppy throwback 🥹 Look how tiny I was', array['throwback', 'puppy']::text[], null, null, null, 18000, 260, 140, now() - interval '5 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p15', 'mochi', 'park', 'duck', 'happy', '/photos/post-p15.jpg', array['/photos/post-p15.jpg']::text[], null, 'Puppy throwback 🥹 Look how tiny I was', array['throwback', 'puppy']::text[], null, null, null, 18000, 260, 140, now() - interval '5 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p16', 'luna', 'blossom', 'none', 'smile', '/photos/post-p16.jpg', null, 'Watching the birds. Planning. 🐦', array['catsofinstagram', 'windowcat']::text[], null, null, null, 11000, 120, 88, now() - interval '6 days')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p16', 'luna', 'blossom', 'none', 'smile', '/photos/post-p16.jpg', array['/photos/post-p16.jpg']::text[], null, 'Watching the birds. Planning. 🐦', array['catsofinstagram', 'windowcat']::text[], null, null, null, 11000, 120, 88, now() - interval '6 days')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
-insert into public.posts (id, pet_id, scene, accessory, expression, image_url, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
-values ('p17', 'bigmac', 'snow', 'bandana', 'happy', '/photos/post-p17.jpg', null, 'Gotcha Day throwback! The day I came home 🏡', array['gotchaday', 'goldenretriever']::text[], null, 'gotcha-day', null, 5200, 73, 61, now() - interval '2 weeks')
-on conflict (id) do update set image_url = excluded.image_url, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
+values ('p17', 'bigmac', 'snow', 'bandana', 'happy', '/photos/post-p17.jpg', array['/photos/post-p17.jpg']::text[], null, 'Gotcha Day throwback! The day I came home 🏡', array['gotchaday', 'goldenretriever']::text[], null, 'gotcha-day', null, 5200, 73, 61, now() - interval '2 weeks')
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);

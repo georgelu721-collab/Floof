@@ -547,29 +547,130 @@ export function PetScene({
   );
 }
 
+type MediaPost = { scene: Scene; accessory: Accessory; expression: Expression; image?: string; images?: string[]; overlay?: string };
+
+/** All photos of a post, cover first. */
+export function photosOf(post: { image?: string; images?: string[] }) {
+  if (post.images && post.images.length) return post.images;
+  return post.image ? [post.image] : [];
+}
+
 export function PostMedia({
   post,
   pet,
   className = "",
+  carousel = false,
 }: {
-  post: { scene: Scene; accessory: Accessory; expression: Expression; image?: string; overlay?: string };
+  post: MediaPost;
   pet: Pet;
   className?: string;
+  /** Swipeable photos with a counter. Off for thumbnails, which show the cover only. */
+  carousel?: boolean;
 }) {
   const [broken, setBroken] = useState<string | null>(null);
+  const photos = photosOf(post);
+  const cover = photos[0];
+  const multi = photos.length > 1;
+
+  const overlay = post.overlay && (
+    <span className="pointer-events-none absolute right-4 top-11 max-w-[60%] rotate-[-6deg] text-right font-hand text-3xl leading-tight text-white [text-shadow:0_0_2px_#4a2e22,0_1px_2px_#4a2e22,0_2px_8px_rgba(74,46,34,.6)]">
+      {post.overlay}
+    </span>
+  );
+
+  if (carousel && multi) return <Carousel photos={photos} overlay={overlay} className={className} />;
+
   return (
     <div className={`relative overflow-hidden bg-sand ${className}`}>
-      {post.image && broken !== post.image ? (
+      {cover && broken !== cover ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.image} alt="" loading="lazy" onError={() => setBroken(post.image ?? null)} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={cover} alt="" loading="lazy" onError={() => setBroken(cover)} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <PetScene pet={pet} scene={post.scene} accessory={post.accessory} expression={post.expression} className="absolute inset-0 h-full w-full" />
       )}
-      {post.overlay && (
-        <span className="pointer-events-none absolute right-4 top-4 max-w-[60%] rotate-[-6deg] text-right font-hand text-3xl leading-tight text-white [text-shadow:0_0_2px_#4a2e22,0_1px_2px_#4a2e22,0_2px_8px_rgba(74,46,34,.6)]">
-          {post.overlay}
+      {overlay}
+      {multi && (
+        <span className="absolute right-2 top-2 text-white drop-shadow" aria-label={`${photos.length} photos`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round">
+            <rect x="7" y="7" width="13" height="13" rx="2.5" fill="currentColor" fillOpacity=".35" />
+            <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+          </svg>
         </span>
       )}
+    </div>
+  );
+}
+
+function Carousel({ photos, overlay, className }: { photos: string[]; overlay: React.ReactNode; className: string }) {
+  const [index, setIndex] = useState(0);
+  const [track, setTrack] = useState<HTMLDivElement | null>(null);
+
+  const go = (i: number) => {
+    if (!track) return;
+    const next = Math.max(0, Math.min(photos.length - 1, i));
+    track.scrollTo({ left: next * track.clientWidth, behavior: "smooth" });
+  };
+
+  return (
+    <div className={`group relative overflow-hidden bg-sand ${className}`}>
+      <div
+        ref={setTrack}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+        }}
+        className="no-scrollbar absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+      >
+        {photos.map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={src + i}
+            src={src}
+            alt={`Photo ${i + 1} of ${photos.length}`}
+            loading={i === 0 ? "eager" : "lazy"}
+            draggable={false}
+            className="h-full w-full shrink-0 snap-center object-cover"
+          />
+        ))}
+      </div>
+      {index === 0 && overlay}
+
+      <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-cocoa/70 px-2.5 py-0.5 text-xs font-bold text-white">
+        {index + 1}/{photos.length}
+      </span>
+
+      {index > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            go(index - 1);
+          }}
+          aria-label="Previous photo"
+          className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-paper/85 pb-0.5 text-2xl font-bold leading-none text-cocoa shadow"
+        >
+          ‹
+        </button>
+      )}
+      {index < photos.length - 1 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            go(index + 1);
+          }}
+          aria-label="Next photo"
+          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-paper/85 pb-0.5 text-2xl font-bold leading-none text-cocoa shadow"
+        >
+          ›
+        </button>
+      )}
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+        {photos.map((_, i) => (
+          <span key={i} className={`h-1.5 rounded-full transition-all ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/60"}`} />
+        ))}
+      </div>
     </div>
   );
 }
