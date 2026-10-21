@@ -175,5 +175,5 @@ export type Thread = {
   id: string;
   petIds: string[];
   title: string;
-  messages: { id: string; from: string; text: string; at: string }[];
+  messages: { id: string; from: string; text: string; at: string; ts?: number }[];
 };

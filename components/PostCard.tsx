@@ -6,6 +6,7 @@ import { compact, MOMENT_TYPES, timeAgo } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import type { Post } from "@/lib/types";
 import { BiscuitSheet } from "./BiscuitSheet";
+import { ShareSheet } from "./ShareSheet";
 import { BiscuitIcon, IconBookmark, IconComment, IconHeart, IconMore, IconSend, PawIcon } from "./Icons";
 import { PetAvatar, PostMedia } from "./PetArt";
 
@@ -23,6 +24,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
   const { pet, s, dispatch, toast, me } = useStore();
   const owner = pet(post.petId);
   const [sheet, setSheet] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [burst, setBurst] = useState(0);
   const [extraBiscuits, setExtraBiscuits] = useState(0);
   const lastTap = useRef(0);
@@ -39,19 +41,6 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
       setBurst((b) => b + 1);
     }
     lastTap.current = now;
-  };
-
-  const share = async () => {
-    const url = `${window.location.origin}/post/${post.id}`;
-    try {
-      if (navigator.share) await navigator.share({ title: `${owner.name} on Floof`, url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast("Link copied 🔗");
-      }
-    } catch {
-      /* share cancelled */
-    }
   };
 
   const when = post.createdAt ? timeAgo(post.createdAt) : post.ago;
@@ -117,7 +106,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
           <BiscuitIcon size={24} />
           {compact(post.biscuits + extraBiscuits)}
         </button>
-        <button onClick={share} aria-label="Share">
+        <button onClick={() => setShareOpen(true)} aria-label="Share">
           <IconSend />
         </button>
         <button className="ml-auto" onClick={() => dispatch({ t: "save", postId: post.id })} aria-pressed={saved} aria-label="Save">
@@ -164,6 +153,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{when}</p>
       </div>
 
+      {shareOpen && <ShareSheet post={post} onClose={() => setShareOpen(false)} />}
       {sheet && <BiscuitSheet pet={owner} postId={post.id} onClose={() => setSheet(false)} onSent={(n) => setExtraBiscuits((x) => x + n)} />}
     </article>
   );

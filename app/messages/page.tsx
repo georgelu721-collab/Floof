@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { THREADS } from "@/lib/data";
+import { SHARED_POST_RE, THREADS } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { PetAvatar } from "@/components/PetArt";
 import { Page, TopBar } from "@/components/Shell";
@@ -47,7 +47,7 @@ export default function Messages() {
 
       <ul className="px-4">
         {filtered.map((t) => {
-          const local = s.threads[t.id] ?? s.threads[`dm-${t.petIds[0]}`] ?? [];
+          const local = s.threads[t.id] ?? (t.petIds.length === 1 ? s.threads[`dm-${t.petIds[0]}`] : undefined) ?? [];
           const last = local[local.length - 1] ?? t.messages[t.messages.length - 1];
           const first = pet(t.petIds[0]);
           if (!first) return null;
@@ -66,7 +66,7 @@ export default function Messages() {
                 <div className="min-w-0 flex-1">
                   <p className="font-extrabold">{t.title}</p>
                   <p className="truncate text-sm font-semibold text-muted">
-                    {last ? `${last.text} · ${last.at}` : "Say hi 👋"}
+                    {last ? `${SHARED_POST_RE.test(last.text) ? (last.from === "me" ? "You shared a floof" : "Shared a floof 🐾") : last.text} · ${last.at}` : "Say hi 👋"}
                   </p>
                 </div>
               </Link>

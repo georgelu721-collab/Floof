@@ -205,6 +205,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
         id: m.id,
         from: m.from_pet === myPetId ? "me" : m.from_pet,
         text: m.text,
+        ts: Date.parse(m.created_at),
         at: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       });
     }

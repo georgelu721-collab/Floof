@@ -173,7 +173,7 @@ function reducer(s: State, a: Action): State {
     case "meetupsOptIn":
       return { ...s, meetupsOptIn: a.on };
     case "message": {
-      const msg = { id: uid(), from: "me", text: a.text, at: "now" };
+      const msg = { id: uid(), from: "me", text: a.text, at: "now", ts: Date.now() };
       let interactions = s.interactions;
       for (const p of a.petIds) interactions = bump(interactions, p, 1);
       return { ...s, threads: { ...s.threads, [a.threadId]: [...(s.threads[a.threadId] ?? []), msg] }, interactions };
@@ -354,7 +354,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         t: "incoming",
         threadId: `dm-${m.from_pet}`,
         petId: m.from_pet,
-        msg: { id: m.id, from: m.from_pet, text: m.text, at: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
+        msg: { id: m.id, from: m.from_pet, text: m.text, ts: Date.parse(m.created_at), at: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) },
       }),
     );
   }, [myPetId]);

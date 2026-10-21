@@ -888,3 +888,15 @@ export function timeAgo(ms: number, now = Date.now()) {
   if (d < 7) return `${d}d`;
   return `${Math.floor(d / 7)}w`;
 }
+
+/** Conversation key for a direct message with a pet (local demo keeps its sample chats). */
+export function dmKey(petId: string, cloud: boolean) {
+  if (!cloud) {
+    const seeded = THREADS.find((t) => t.petIds.length === 1 && t.petIds[0] === petId);
+    if (seeded) return seeded.id;
+  }
+  return `dm-${petId}`;
+}
+
+/** Finds a shared Floof post link inside a message. */
+export const SHARED_POST_RE = /(?:https?:\/\/[^\s]+)?\/post\/([A-Za-z0-9_-]+)/;

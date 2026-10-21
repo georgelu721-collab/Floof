@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { THREADS } from "@/lib/data";
+import { SHARED_POST_RE, THREADS } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { PetAvatar } from "@/components/PetArt";
+import { PetAvatar, PostMedia } from "@/components/PetArt";
 import { BiscuitSheet } from "@/components/BiscuitSheet";
 import { TopBar } from "@/components/Shell";
 import { BiscuitIcon, IconSend } from "@/components/Icons";
@@ -55,10 +55,7 @@ export default function Thread() {
           return (
             <div key={m.id} className={`flex items-end gap-2 ${mine ? "justify-end" : ""}`}>
               {!mine && from && <PetAvatar pet={from} size={26} />}
-              <div className={`max-w-[75%] rounded-3xl px-4 py-2.5 text-[15px] font-semibold ${mine ? "rounded-br-md bg-cocoa text-white" : "rounded-bl-md bg-paper shadow-sm"}`}>
-                {m.text}
-                <span className={`ml-2 text-[10px] ${mine ? "text-white/60" : "text-muted"}`}>{m.at}</span>
-              </div>
+              <MessageBody text={m.text} at={m.at} mine={mine} />
             </div>
           );
         })}
@@ -80,5 +77,39 @@ export default function Thread() {
       </form>
       {sheet && <BiscuitSheet pet={other} onClose={() => setSheet(false)} />}
     </main>
+  );
+}
+
+/** A chat bubble; Floof post links become a tappable post preview. */
+function MessageBody({ text, at, mine }: { text: string; at: string; mine: boolean }) {
+  const { post, pet } = useStore();
+  const match = text.match(SHARED_POST_RE);
+  const shared = match ? post(match[1]) : undefined;
+  const owner = shared ? pet(shared.petId) : undefined;
+  const words = (match ? text.replace(match[0], "") : text).trim();
+  const bubble = `max-w-[75%] rounded-3xl text-[15px] font-semibold ${mine ? "rounded-br-md bg-cocoa text-white" : "rounded-bl-md bg-paper shadow-sm"}`;
+  const time = <span className={`ml-2 text-[10px] ${mine ? "text-white/60" : "text-muted"}`}>{at}</span>;
+
+  if (!shared || !owner) {
+    return (
+      <div className={`${bubble} whitespace-pre-line break-words px-4 py-2.5`}>
+        {text}
+        {time}
+      </div>
+    );
+  }
+  return (
+    <div className={`${bubble} w-60 overflow-hidden p-1.5`}>
+      <Link href={`/post/${shared.id}`} className="block overflow-hidden rounded-[1.25rem] bg-paper text-cocoa">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <PetAvatar pet={owner} size={24} />
+          <span className="truncate text-xs font-extrabold">{owner.handle}</span>
+        </div>
+        <PostMedia post={shared} pet={owner} className="aspect-square" />
+        <p className="line-clamp-2 px-3 py-2 text-xs font-semibold">{shared.caption}</p>
+      </Link>
+      {words && <p className="whitespace-pre-line break-words px-2.5 pb-1 pt-2">{words}</p>}
+      <p className="px-2.5 pb-1 text-right">{time}</p>
+    </div>
   );
 }
