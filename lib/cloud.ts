@@ -380,6 +380,16 @@ export const remote = {
 
 /* ---------------- Notifications from real activity ---------------- */
 
+/** Pet ids that follow this pet, or that this pet follows (newest first). */
+export async function loadFollowList(petId: string, kind: "followers" | "following"): Promise<string[]> {
+  const col = kind === "followers" ? "follower_id" : "followee_id";
+  const match = kind === "followers" ? "followee_id" : "follower_id";
+  const rows = mustAny(
+    await sb().from("follows").select(col).eq(match, petId).order("created_at", { ascending: false }).limit(1000),
+  ) as Record<string, string>[];
+  return rows.map((r) => r[col]);
+}
+
 export async function loadNotifications(petId: string): Promise<Notification[]> {
   const db = sb();
   const [boops, comments, follows, biscuits] = (await Promise.all([

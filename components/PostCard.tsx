@@ -122,10 +122,23 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
           </p>
         )}
         {!full && post.commentCount > 0 && (
-          <Link href={`/post/${post.id}`} className="block text-sm font-semibold text-muted">
-            View all {compact(post.commentCount)} comments
+          <Link href={`/post/${post.id}#comments`} className="block text-sm font-semibold text-muted">
+            {post.commentCount === 1 ? "View 1 comment" : `View all ${compact(post.commentCount)} comments`}
           </Link>
         )}
+        {!full &&
+          post.comments.slice(-2).map((c) => {
+            const by = pet(c.petId);
+            if (!by) return null;
+            return (
+              <p key={c.id} className="truncate text-sm">
+                <Link href={`/profile/${by.handle}`} className="font-extrabold">
+                  {by.handle}
+                </Link>{" "}
+                {c.text}
+              </p>
+            );
+          })}
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{when}</p>
       </div>
 

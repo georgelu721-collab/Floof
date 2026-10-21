@@ -1,6 +1,6 @@
 // Generates supabase/seed.sql from lib/data.ts.  Run: node --experimental-strip-types scripts/gen-seed.mts
 import { writeFileSync } from "node:fs";
-import { PETS, POSTS } from "../lib/data.ts";
+import { AFFINITY, PETS, POSTS } from "../lib/data.ts";
 
 const q = (v: unknown): string => {
   if (v === null || v === undefined) return "null";
@@ -36,7 +36,7 @@ for (const x of POSTS) {
   out.push(
     `insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values (${[x.id, x.petId, x.scene, x.accessory, x.expression, x.image, x.images ?? (x.image ? [x.image] : []), x.overlay, x.caption, x.tags, x.location, x.moment, x.slides].map(q).join(", ")}, ${x.boops}, ${x.biscuits}, ${Math.max(0, x.commentCount - x.comments.length)}, now() - ${interval(x.ago)})
-on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
+on conflict (id) do update set image_url = excluded.image_url, image_urls = excluded.image_urls, comments_base = excluded.comments_base, overlay = excluded.overlay, caption = excluded.caption, tags = excluded.tags,
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);`,
   );
@@ -46,6 +46,12 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
 select ${q(crypto.randomUUID())}::uuid, ${q(x.id)}, ${q(c.petId)}, ${q(c.text)}, ${c.likes}, now() - ${interval(c.ago)}
 where not exists (select 1 from public.comments where post_id = ${q(x.id)} and pet_id = ${q(c.petId)} and text = ${q(c.text)});`,
     );
+  }
+}
+out.push("", "-- House pets follow their friends (from AFFINITY).");
+for (const [a, friends] of Object.entries(AFFINITY)) {
+  for (const b of Object.keys(friends)) {
+    out.push(`insert into public.follows (follower_id, followee_id) values (${q(a)}, ${q(b)}) on conflict do nothing;`);
   }
 }
 writeFileSync(new URL("../supabase/seed.sql", import.meta.url), out.join("\n") + "\n");

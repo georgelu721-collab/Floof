@@ -21,7 +21,7 @@ const TABS = [
 export default function Profile() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
-  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready } = useStore();
+  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready, cloud } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("floofs");
   const [sheet, setSheet] = useState(false);
   const pet = pets.find((p) => p.handle === decodeURIComponent(handle));
@@ -86,8 +86,12 @@ export default function Profile() {
           <PetAvatar pet={pet} size={92} ring="story" />
           <div className="grid flex-1 grid-cols-3 text-center">
             <Stat n={pet.postCount ?? (pet.owner === "You" ? 0 : 100 + (pet.pawScore % 200)) + theirPosts.length} label="Floofs" />
-            <Stat n={followers} label="Followers" />
-            <Stat n={pet.following + (isMe ? Object.keys(s.following).length : 0)} label="Following" />
+            <Stat n={followers} label="Followers" href={`/profile/${pet.handle}/followers`} />
+            <Stat
+              n={isMe ? (cloud ? Object.keys(s.following).length : pet.following + Object.keys(s.following).length) : pet.following}
+              label="Following"
+              href={`/profile/${pet.handle}/following`}
+            />
           </div>
         </div>
 
@@ -207,11 +211,18 @@ export default function Profile() {
   );
 }
 
-function Stat({ n, label }: { n: number; label: string }) {
-  return (
-    <div>
+function Stat({ n, label, href }: { n: number; label: string; href?: string }) {
+  const body = (
+    <>
       <p className="font-display text-xl font-semibold">{compact(n)}</p>
       <p className="text-xs font-bold text-muted">{label}</p>
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="rounded-xl py-1 transition hover:bg-sand active:scale-95">
+      {body}
+    </Link>
+  ) : (
+    <div className="py-1">{body}</div>
   );
 }

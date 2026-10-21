@@ -35,14 +35,10 @@ export default function PostPage() {
     <Page>
       <TopBar title="Floof" />
       <PostCard post={p} full />
-      <form onSubmit={submit} className="mb-5 flex items-center gap-2 px-4">
-        <PetAvatar pet={me} size={34} />
-        <input className="input" placeholder="Add a kind comment…" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} />
-        <button className="font-extrabold text-blush disabled:opacity-40" disabled={!text.trim()}>
-          Post
-        </button>
-      </form>
-      <section className="space-y-4 px-4">
+      <h2 id="comments" className="px-4 pb-3 pt-1 font-display text-lg font-semibold">
+        Comments <span className="text-muted">{p.comments.length}</span>
+      </h2>
+      <section className="space-y-4 px-4 pb-20">
         {p.comments.map((c) => {
           const cp = pet(c.petId);
           if (!cp) return null;
@@ -68,6 +64,13 @@ export default function PostPage() {
         })}
         {p.comments.length === 0 && <p className="text-center text-sm font-semibold text-muted">Be the first to say something kind ♡</p>}
       </section>
+      <form onSubmit={submit} className="fixed bottom-[76px] left-1/2 z-30 flex w-full max-w-[440px] -translate-x-1/2 items-center gap-2 border-t border-oat bg-cream/95 px-4 py-2.5 backdrop-blur">
+        <PetAvatar pet={me} size={34} />
+        <input className="input" enterKeyHint="send" placeholder="Add a kind comment…" value={text} onChange={(e) => setText(e.target.value)} maxLength={200} />
+        <button className="font-extrabold text-blush disabled:opacity-40" disabled={!text.trim()}>
+          Post
+        </button>
+      </form>
     </Page>
   );
 }

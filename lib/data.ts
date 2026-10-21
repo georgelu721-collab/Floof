@@ -585,6 +585,37 @@ export const POSTS: Post[] = [
   },
 ];
 
+// Give every sample post a handful of real comments, so the comment count matches the list.
+const FRIENDLY = [
+  "So cute!! 😍",
+  "This made my day ♡",
+  "Boop boop boop 🐾",
+  "Look at that face 🥹",
+  "Absolute floof goals",
+  "Need this energy today",
+  "Sending biscuits your way 🍪",
+  "Iconic.",
+  "My human would steal you instantly",
+  "Can we be friends?",
+  "The cutest thing on Floof today",
+  "10/10 would boop again",
+];
+for (const [i, post] of POSTS.entries()) {
+  const others = PETS.filter((p) => p.id !== post.petId);
+  const want = 3 + ((i * 7) % 5);
+  for (let k = post.comments.length; k < want; k++) {
+    const by = others[(i * 3 + k * 5) % others.length];
+    post.comments.push({
+      id: `${post.id}-c${k}`,
+      petId: by.id,
+      text: FRIENDLY[(i * 5 + k * 7) % FRIENDLY.length],
+      ago: `${k + 1}h`,
+      likes: (i * 13 + k * 7) % 40,
+    });
+  }
+  post.commentCount = post.comments.length;
+}
+
 /** Seeded "best friend" affinity between pets (like Snap's friend emojis). */
 export const AFFINITY: Record<string, Record<string, { score: number; streak: number }>> = {
   bigmac: {
