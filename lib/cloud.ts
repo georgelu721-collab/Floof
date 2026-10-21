@@ -126,6 +126,9 @@ const mustAny = (res: { data: unknown; error: { message: string } | null }): unk
   return res.data;
 };
 
+/** For newer features: if the table isn't set up yet, carry on with nothing instead of failing. */
+const soft = (res: { data: unknown; error: { message: string } | null }): unknown => (res.error ? [] : res.data);
+
 const bump = (m: Record<string, number>, id: string, n: number) => {
   m[id] = (m[id] ?? 0) + n;
 };
@@ -177,7 +180,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     db.from("post_feed").select("*").gte("daily_date", addDays(today, -2)).order("created_at", { ascending: false }).limit(300),
     db.from("daily_votes").select("day, post_id, voter_id").gte("day", yesterday).limit(5000),
     db.from("lost_alerts").select("*").order("created_at", { ascending: false }).limit(100),
-  ]).then((r) => r.map(mustAny)) as [
+  ]).then((r) => r.map((x, i) => (i >= 5 ? soft(x) : mustAny(x)))) as [
     PetRow[],
     PostRow[],
     { clan: Clan; points: number }[],
@@ -221,7 +224,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
       db.from("posts").select("created_at").eq("pet_id", myPetId).order("created_at", { ascending: false }).limit(1000),
       db.from("reminders").select("*").eq("pet_id", myPetId).order("due_date"),
       db.from("pet_weights").select("*").eq("pet_id", myPetId).order("measured_on"),
-    ]).then((r) => r.map(mustAny))) as [
+    ]).then((r) => r.map((x, i) => (i >= 10 ? soft(x) : mustAny(x))))) as [
       { post_id: string; created_at: string }[],
       { post_id: string }[],
       { followee_id: string }[],
