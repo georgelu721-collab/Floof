@@ -2,7 +2,8 @@
 
 import { sb } from "./supabase";
 import { timeAgo } from "./data";
-import type { Clan, Comment, LedgerEntry, MomentType, Notification, Pet, Post, Thread } from "./types";
+import { addDays, dayKey } from "./daily";
+import type { Clan, Comment, LedgerEntry, LostAlert, MomentType, Notification, Pet, Post, Reminder, Thread, Weight } from "./types";
 
 /* ---------------- Row → app model mapping ---------------- */
 
@@ -26,6 +27,8 @@ type PetRow = {
   following: number;
   biscuits_received: number;
   post_count: number;
+  birthday: string | null;
+  gotcha_day: string | null;
 };
 
 type PostRow = {
@@ -44,6 +47,7 @@ type PostRow = {
   status: "pending" | "approved" | "rejected" | null;
   moderation_note: string | null;
   slides: number | null;
+  daily_date: string | null;
   created_at: string;
   boop_count: number;
   comment_count: number;
@@ -68,6 +72,8 @@ const toPet = (r: PetRow): Pet => ({
   biscuitsReceived: r.biscuits_received,
   pawScore: r.paw_score_base,
   postCount: r.post_count,
+  birthday: r.birthday ?? undefined,
+  gotchaDay: r.gotcha_day ?? undefined,
   clan: r.clan ?? "dogs",
   verified: r.verified,
   bg: r.bg,
@@ -85,7 +91,14 @@ export type Snapshot = {
   voteCounts: Record<string, Record<string, number>>; // competition -> post -> votes
   entries: Record<string, string[]>; // competition -> post ids (all pets)
   initialVotes: Record<string, string>;
+  dailyVoteCounts: Record<string, Record<string, number>>; // day -> post -> votes
+  alerts: LostAlert[];
   mine: {
+    dailyVotes: Record<string, string>; // day -> post I voted for
+    myPostDays: string[];
+    interactionDays: Record<string, string[]>; // pet -> days I interacted with them
+    reminders: Reminder[];
+    weights: Weight[];
     boops: Record<string, true>;
     saved: Record<string, true>;
     following: Record<string, true>;
@@ -117,18 +130,65 @@ const bump = (m: Record<string, number>, id: string, n: number) => {
   m[id] = (m[id] ?? 0) + n;
 };
 
+type AlertRow = {
+  id: string;
+  kind: "lost" | "found";
+  reporter_id: string;
+  pet_id: string | null;
+  name: string;
+  description: string;
+  suburb: string;
+  city: string;
+  last_seen: string;
+  photo_url: string | null;
+  status: "active" | "resolved";
+  resolved_at: string | null;
+  created_at: string;
+};
+
+const toAlert = (a: AlertRow): LostAlert => ({
+  id: a.id,
+  kind: a.kind,
+  reporterId: a.reporter_id,
+  petId: a.pet_id ?? undefined,
+  name: a.name,
+  description: a.description,
+  suburb: a.suburb,
+  city: a.city,
+  lastSeen: a.last_seen,
+  photo: a.photo_url ?? undefined,
+  status: a.status,
+  createdAt: Date.parse(a.created_at),
+});
+
 export async function loadSnapshot(): Promise<Snapshot> {
   const db = sb();
   const { data: auth } = await db.auth.getSession();
   const userId = auth.session?.user.id ?? null;
 
-  const [petRows, postRows, clanRows, voteRows, entryRows] = await Promise.all([
+  const today = dayKey();
+  const yesterday = addDays(today, -1);
+  const [petRows, feedRows, clanRows, voteRows, entryRows, dailyRows, dailyVoteRows, alertRows] = await Promise.all([
     db.from("pet_profiles").select("*").order("created_at", { ascending: true }).limit(1000),
     db.from("post_feed").select("*").order("created_at", { ascending: false }).limit(300),
     db.from("clan_totals").select("*"),
     db.from("competition_vote_counts").select("*"),
     db.from("competition_entries").select("competition_id, post_id, pet_id"),
-  ]).then((r) => r.map(mustAny)) as [PetRow[], PostRow[], { clan: Clan; points: number }[], { competition_id: string; post_id: string; votes: number }[], { competition_id: string; post_id: string; pet_id: string }[]];
+    db.from("post_feed").select("*").gte("daily_date", addDays(today, -2)).order("created_at", { ascending: false }).limit(300),
+    db.from("daily_votes").select("day, post_id, voter_id").gte("day", yesterday).limit(5000),
+    db.from("lost_alerts").select("*").order("created_at", { ascending: false }).limit(100),
+  ]).then((r) => r.map(mustAny)) as [
+    PetRow[],
+    PostRow[],
+    { clan: Clan; points: number }[],
+    { competition_id: string; post_id: string; votes: number }[],
+    { competition_id: string; post_id: string; pet_id: string }[],
+    PostRow[],
+    { day: string; post_id: string; voter_id: string }[],
+    AlertRow[],
+  ];
+  // Today's / yesterday's Daily Floof answers, even if they're older than the main feed window.
+  const postRows = [...feedRows, ...dailyRows.filter((d) => !feedRows.some((f) => f.id === d.id))];
 
   const pets = petRows.map(toPet);
   const postIds = postRows.map((p) => p.id);
@@ -147,34 +207,53 @@ export async function loadSnapshot(): Promise<Snapshot> {
   let myBoops = new Set<string>();
   let myFollows = new Set<string>();
   if (myPetId) {
-    const [boops, saves, follows, myComments, ledger, msgs, rsvps, entries, votes, packs] = (await Promise.all([
-      db.from("boops").select("post_id").eq("pet_id", myPetId),
+    const [boops, saves, follows, myComments, ledger, msgs, rsvps, entries, votes, packs, myPostDates, reminderRows, weightRows] = (await Promise.all([
+      db.from("boops").select("post_id, created_at").eq("pet_id", myPetId),
       db.from("saves").select("post_id").eq("pet_id", myPetId),
       db.from("follows").select("followee_id").eq("follower_id", myPetId),
-      db.from("comments").select("post_id").eq("pet_id", myPetId),
+      db.from("comments").select("post_id, created_at").eq("pet_id", myPetId),
       db.from("biscuit_ledger").select("*").eq("pet_id", myPetId).order("created_at", { ascending: false }).limit(200),
       db.from("messages").select("*").or(`from_pet.eq.${myPetId},to_pet.eq.${myPetId}`).order("created_at").limit(500),
       db.from("event_rsvps").select("*").eq("pet_id", myPetId),
       db.from("competition_entries").select("*").eq("pet_id", myPetId),
       db.from("competition_votes").select("*").eq("voter_id", myPetId),
       db.from("pack_members").select("pack_id").eq("pet_id", myPetId),
+      db.from("posts").select("created_at").eq("pet_id", myPetId).order("created_at", { ascending: false }).limit(1000),
+      db.from("reminders").select("*").eq("pet_id", myPetId).order("due_date"),
+      db.from("pet_weights").select("*").eq("pet_id", myPetId).order("measured_on"),
     ]).then((r) => r.map(mustAny))) as [
-      { post_id: string }[],
+      { post_id: string; created_at: string }[],
       { post_id: string }[],
       { followee_id: string }[],
-      { post_id: string }[],
+      { post_id: string; created_at: string }[],
       { id: string; kind: string; amount: number; counterparty_id: string | null; post_id: string | null; note: string | null; created_at: string }[],
       { id: string; from_pet: string; to_pet: string; text: string; created_at: string }[],
       { event_id: string; status: "interested" | "going"; checked_in: boolean }[],
       { competition_id: string; post_id: string }[],
       { competition_id: string; post_id: string }[],
       { pack_id: string }[],
+      { created_at: string }[],
+      { id: string; title: string; kind: Reminder["kind"]; due_date: string; repeat: Reminder["repeat"] }[],
+      { id: string; measured_on: string; kg: number | string }[],
     ];
+
+    // Which days I interacted with each pet (for best-friend streaks).
+    const days: Record<string, Set<string>> = {};
+    const mark = (pet: string | undefined | null, iso: string) => {
+      if (!pet || pet === myPetId) return;
+      (days[pet] ??= new Set()).add(dayKey(new Date(iso)));
+    };
 
     const ownerOf = new Map(postRows.map((p) => [p.id, p.pet_id]));
     const interactions: Record<string, number> = {};
-    for (const b of boops) if (ownerOf.get(b.post_id)) bump(interactions, ownerOf.get(b.post_id)!, 1);
-    for (const c of myComments) if (ownerOf.get(c.post_id)) bump(interactions, ownerOf.get(c.post_id)!, 2);
+    for (const b of boops) if (ownerOf.get(b.post_id)) {
+      bump(interactions, ownerOf.get(b.post_id)!, 1);
+      mark(ownerOf.get(b.post_id), b.created_at);
+    }
+    for (const c of myComments) if (ownerOf.get(c.post_id)) {
+      bump(interactions, ownerOf.get(c.post_id)!, 2);
+      mark(ownerOf.get(c.post_id), c.created_at);
+    }
     for (const f of follows) bump(interactions, f.followee_id, 3);
 
     let balance = 0;
@@ -184,6 +263,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
       if (l.kind === "sent") {
         balance -= l.amount;
         if (l.counterparty_id) bump(interactions, l.counterparty_id, 5 * l.amount);
+        mark(l.counterparty_id, l.created_at);
       }
       if (l.kind === "received" && l.counterparty_id) bump(interactions, l.counterparty_id, 2 * l.amount);
       led.push({
@@ -201,6 +281,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     for (const m of msgs) {
       const other = m.from_pet === myPetId ? m.to_pet : m.from_pet;
       bump(interactions, other, 1);
+      if (m.from_pet === myPetId) mark(other, m.created_at);
       (threads[`dm-${other}`] ??= []).push({
         id: m.id,
         from: m.from_pet === myPetId ? "me" : m.from_pet,
@@ -213,6 +294,11 @@ export async function loadSnapshot(): Promise<Snapshot> {
     myBoops = new Set(boops.map((b) => b.post_id));
     myFollows = new Set(follows.map((f) => f.followee_id));
     mine = {
+      dailyVotes: Object.fromEntries(dailyVoteRows.filter((v) => v.voter_id === myPetId).map((v) => [v.day, v.post_id])),
+      myPostDays: [...new Set(myPostDates.map((p) => dayKey(new Date(p.created_at))))],
+      interactionDays: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, [...v]])),
+      reminders: reminderRows.map((r) => ({ id: r.id, title: r.title, kind: r.kind, due: r.due_date, repeat: r.repeat })),
+      weights: weightRows.map((w) => ({ id: w.id, date: w.measured_on, kg: Number(w.kg) })),
       boops: Object.fromEntries(boops.map((b) => [b.post_id, true as const])),
       saved: Object.fromEntries(saves.map((b) => [b.post_id, true as const])),
       following: Object.fromEntries(follows.map((f) => [f.followee_id, true as const])),
@@ -247,6 +333,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     status: r.status ?? "approved",
     moderationNote: r.moderation_note ?? undefined,
     slides: r.slides ?? undefined,
+    dailyDate: r.daily_date ?? undefined,
     boops: r.boop_count - (myBoops.has(r.id) ? 1 : 0),
     biscuits: r.biscuit_count,
     commentCount: r.comment_count,
@@ -272,7 +359,30 @@ export async function loadSnapshot(): Promise<Snapshot> {
   const allEntries: Snapshot["entries"] = {};
   for (const e of entryRows) (allEntries[e.competition_id] ??= []).push(e.post_id);
 
-  return { userId, myPetId, pets, posts, clan, myClanFloofs, voteCounts, entries: allEntries, initialVotes: mine?.votes ?? {}, mine };
+  const dailyVoteCounts: Snapshot["dailyVoteCounts"] = {};
+  for (const v of dailyVoteRows) {
+    const day = (dailyVoteCounts[v.day] ??= {});
+    day[v.post_id] = (day[v.post_id] ?? 0) + 1;
+  }
+  const weekAgoIso = Date.now() - 7 * 86_400_000;
+  const alerts = alertRows
+    .filter((a) => a.status === "active" || (a.resolved_at && Date.parse(a.resolved_at) > weekAgoIso))
+    .map(toAlert);
+
+  return {
+    userId,
+    myPetId,
+    pets,
+    posts,
+    clan,
+    myClanFloofs,
+    voteCounts,
+    entries: allEntries,
+    initialVotes: mine?.votes ?? {},
+    dailyVoteCounts,
+    alerts,
+    mine,
+  };
 }
 
 /* ---------------- Writes ---------------- */
@@ -316,6 +426,55 @@ export async function moderatePost(postId: string): Promise<{ status: string; me
 }
 
 export const remote = {
+  async dailyVote(day: string, voter: string, postId: string | null) {
+    const q = sb().from("daily_votes");
+    check(postId ? await q.upsert({ day, voter_id: voter, post_id: postId }) : await q.delete().match({ day, voter_id: voter }));
+  },
+  async addReminder(pet: string, r: Reminder) {
+    check(await sb().from("reminders").insert({ id: r.id, pet_id: pet, title: r.title, kind: r.kind, due_date: r.due, repeat: r.repeat }));
+  },
+  async updateReminder(r: Reminder) {
+    check(await sb().from("reminders").update({ due_date: r.due }).eq("id", r.id));
+  },
+  async deleteReminder(id: string) {
+    check(await sb().from("reminders").delete().eq("id", id));
+  },
+  async addWeight(pet: string, w: Weight) {
+    check(await sb().from("pet_weights").insert({ id: w.id, pet_id: pet, measured_on: w.date, kg: w.kg }));
+  },
+  async deleteWeight(id: string) {
+    check(await sb().from("pet_weights").delete().eq("id", id));
+  },
+  async postAlert(a: LostAlert) {
+    const photo = a.photo?.startsWith("data:") ? await uploadPhoto(a.photo, "alert") : a.photo;
+    check(
+      await sb().from("lost_alerts").insert({
+        id: a.id,
+        kind: a.kind,
+        reporter_id: a.reporterId,
+        pet_id: a.petId ?? null,
+        name: a.name,
+        description: a.description,
+        suburb: a.suburb,
+        city: a.city,
+        last_seen: a.lastSeen,
+        photo_url: photo ?? null,
+      }),
+    );
+  },
+  async resolveAlert(id: string) {
+    check(await sb().from("lost_alerts").update({ status: "resolved", resolved_at: new Date().toISOString() }).eq("id", id));
+  },
+  async savePushSubscription(pet: string, sub: PushSubscriptionJSON) {
+    check(
+      await sb()
+        .from("push_subscriptions")
+        .upsert({ pet_id: pet, endpoint: sub.endpoint, p256dh: sub.keys?.p256dh ?? "", auth: sub.keys?.auth ?? "" }, { onConflict: "endpoint" }),
+    );
+  },
+  async deletePushSubscription(endpoint: string) {
+    check(await sb().from("push_subscriptions").delete().eq("endpoint", endpoint));
+  },
   async deletePost(id: string) {
     check(await sb().from("posts").delete().eq("id", id));
   },
@@ -324,8 +483,9 @@ export const remote = {
     const { data: auth } = await db.auth.getSession();
     if (!auth.session) throw new Error("Please log in first");
     const photo = pet.photo?.startsWith("data:") ? await uploadPhoto(pet.photo, "avatar") : pet.photo;
-    check(
-      await db.from("pets").insert({
+    const res = await db
+      .from("pets")
+      .insert({
         owner_id: auth.session.user.id,
         handle: pet.handle,
         name: pet.name,
@@ -338,10 +498,16 @@ export const remote = {
         photo_url: photo ?? null,
         bg: pet.bg,
         clan: pet.clan,
-      }),
-    );
+      })
+      .select("id")
+      .single();
+    check(res);
+    return (res.data as { id: string }).id;
   },
-  async updatePet(id: string, patch: Partial<{ clan: Clan; meetups_opt_in: boolean; name: string; bio: string[]; photo_url: string }>) {
+  async updatePet(
+    id: string,
+    patch: Partial<{ clan: Clan; meetups_opt_in: boolean; name: string; bio: string[]; photo_url: string | null; breed: string; age: string; city: string; birthday: string | null; gotcha_day: string | null }>,
+  ) {
     check(await sb().from("pets").update(patch).eq("id", id));
   },
   async toggle(table: "boops" | "saves", on: boolean, row: { post_id: string; pet_id: string }) {
@@ -374,6 +540,7 @@ export const remote = {
         tags: p.tags,
         location: p.location ?? null,
         moment: p.moment ?? null,
+        daily_date: p.dailyDate ?? null,
       }),
     );
   },
@@ -466,5 +633,46 @@ export function subscribeToMessages(petId: string, onMessage: (m: { id: string; 
     .subscribe();
   return () => {
     void sb().removeChannel(channel);
+  };
+}
+
+/** The last 7 days for my pet: what came in and what I posted. */
+export type Recap = { boops: number; comments: number; followers: number; biscuits: number; posts: number; topPostId?: string; fans: string[] };
+
+export async function loadRecap(petId: string): Promise<Recap> {
+  const db = sb();
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const [boops, comments, follows, biscuits, posts] = (await Promise.all([
+    db.from("boops").select("post_id, pet_id, posts!inner(pet_id)").eq("posts.pet_id", petId).neq("pet_id", petId).gte("created_at", since).limit(2000),
+    db.from("comments").select("pet_id, posts!inner(pet_id)").eq("posts.pet_id", petId).neq("pet_id", petId).gte("created_at", since).limit(2000),
+    db.from("follows").select("follower_id").eq("followee_id", petId).gte("created_at", since).limit(2000),
+    db.from("biscuit_ledger").select("amount, counterparty_id").eq("pet_id", petId).eq("kind", "received").gte("created_at", since).limit(2000),
+    db.from("posts").select("id").eq("pet_id", petId).gte("created_at", since).limit(500),
+  ]).then((r) => r.map(mustAny))) as [
+    { post_id: string; pet_id: string }[],
+    { pet_id: string }[],
+    { follower_id: string }[],
+    { amount: number; counterparty_id: string | null }[],
+    { id: string }[],
+  ];
+  const perPost: Record<string, number> = {};
+  const fanScore: Record<string, number> = {};
+  for (const b of boops) {
+    perPost[b.post_id] = (perPost[b.post_id] ?? 0) + 1;
+    fanScore[b.pet_id] = (fanScore[b.pet_id] ?? 0) + 1;
+  }
+  for (const c of comments) fanScore[c.pet_id] = (fanScore[c.pet_id] ?? 0) + 2;
+  for (const b of biscuits) if (b.counterparty_id) fanScore[b.counterparty_id] = (fanScore[b.counterparty_id] ?? 0) + 3 * b.amount;
+  return {
+    boops: boops.length,
+    comments: comments.length,
+    followers: follows.length,
+    biscuits: biscuits.reduce((a, b) => a + b.amount, 0),
+    posts: posts.length,
+    topPostId: Object.entries(perPost).sort((a, b) => b[1] - a[1])[0]?.[0],
+    fans: Object.entries(fanScore)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id]) => id),
   };
 }

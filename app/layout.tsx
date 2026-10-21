@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { Toast } from "@/components/Shell";
+import { ClientOnly } from "@/components/ClientOnly";
 
 const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -44,8 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <StoreProvider>
           <div className="relative mx-auto min-h-dvh w-full max-w-[440px] bg-cream shadow-[0_0_60px_-20px_rgba(74,46,34,.35)]">
-            {children}
-            <Toast />
+            <ClientOnly>
+              {children}
+              <Toast />
+            </ClientOnly>
           </div>
         </StoreProvider>
       </body>

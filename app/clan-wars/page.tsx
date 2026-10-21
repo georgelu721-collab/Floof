@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CLAN_WAR, compact } from "@/lib/data";
+import { weeklyChallenge } from "@/lib/daily";
 import { useStore } from "@/lib/store";
 import { PetAvatar } from "@/components/PetArt";
 import { Page, SectionTitle, TopBar } from "@/components/Shell";
@@ -73,8 +74,8 @@ export default function ClanWars() {
       </div>
 
       <section className="card mx-4 mt-5 p-5 text-center">
-        <p className="text-xs font-extrabold uppercase tracking-wider text-muted">Current challenge</p>
-        <p className="mt-1 font-display text-xl font-semibold">{CLAN_WAR.challenge}</p>
+        <p className="text-xs font-extrabold uppercase tracking-wider text-muted">This week&apos;s challenge · new every Monday</p>
+        <p className="mt-1 font-display text-xl font-semibold">{weeklyChallenge()}</p>
         <p className="mt-1 text-sm text-cocoa-soft">Every floof you post = +5 points for your team. Biscuits sent between clans = bonus friendship points.</p>
         {s.clan ? (
           <>

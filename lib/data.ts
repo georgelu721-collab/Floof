@@ -751,6 +751,7 @@ export const MEETUPS: Meetup[] = [
     attendees: ["toby", "biscuit", "bigmac"],
     momentType: "first-beach",
     forSpecies: ["dog"],
+    recurring: "Every 2nd Saturday",
   },
   {
     id: "cat-cafe",
@@ -767,6 +768,7 @@ export const MEETUPS: Meetup[] = [
     going: 12,
     attendees: ["luna", "pepper", "nala"],
     forSpecies: ["cat"],
+    recurring: "First Sunday of the month",
   },
   {
     id: "puppy-playdate",
@@ -784,6 +786,7 @@ export const MEETUPS: Meetup[] = [
     attendees: ["ollie", "mochi"],
     momentType: "first-park",
     forSpecies: ["dog"],
+    recurring: "Every Saturday morning",
   },
 ];
 
@@ -900,3 +903,32 @@ export function dmKey(petId: string, cloud: boolean) {
 
 /** Finds a shared Floof post link inside a message. */
 export const SHARED_POST_RE = /(?:https?:\/\/[^\s]+)?\/post\/([A-Za-z0-9_-]+)/;
+
+/** Sample content for the local demo (the live app starts empty). */
+export const DEMO_ALERTS: import("./types").LostAlert[] = [
+  {
+    id: "demo-found-1",
+    kind: "found",
+    reporterId: "toby",
+    name: "Friendly kelpie (no collar)",
+    description: "Found near the dog park gates, very friendly, brown with a white chest. Safe with us for now!",
+    suburb: "Centennial Park",
+    city: "Sydney",
+    lastSeen: "This morning, 8am",
+    status: "active",
+    createdAt: 0,
+  },
+];
+
+export function demoReminders(today: string): import("./types").Reminder[] {
+  const plus = (n: number) => {
+    const [y, m, d] = today.split("-").map(Number);
+    const t = new Date(y, m - 1, d + n);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  };
+  return [
+    { id: "demo-r1", title: "Flea & tick treatment", kind: "flea", due: plus(2), repeat: "monthly" },
+    { id: "demo-r2", title: "Annual vaccination", kind: "vaccination", due: plus(40), repeat: "yearly" },
+  ];
+}
+

@@ -18,7 +18,7 @@ const TIPS = [
 
 export default function PawScorePage() {
   const { handle } = useParams<{ handle: string }>();
-  const { pets, me, pet: petById, pawScore, pawBreakdown, s, signedIn, ready } = useStore();
+  const { pets, me, pet: petById, pawScore, pawBreakdown, s, signedIn, ready, level } = useStore();
   const pet = me.handle === decodeURIComponent(handle) ? me : pets.find((p) => p.handle === decodeURIComponent(handle));
 
   if (!pet) {
@@ -54,6 +54,22 @@ export default function PawScorePage() {
         <PetAvatar pet={pet} size={72} ring="story" className="mx-auto" />
         <p className="mt-2 font-display text-lg font-semibold">{pet.name}</p>
         <p className="font-display text-5xl font-bold tabular-nums">{score.toLocaleString()}</p>
+        {(() => {
+          const l = level(pet.id);
+          return (
+            <div className="mx-auto mt-3 max-w-[260px]">
+              <div className="flex justify-between text-xs font-extrabold">
+                <span>
+                  Level {l.level} · {l.tier}
+                </span>
+                <span className="text-muted">{l.toNext.toLocaleString()} to Lv {l.level + 1}</span>
+              </div>
+              <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-paper/70">
+                <div className="h-full rounded-full bg-gradient-to-r from-peach to-blush" style={{ width: `${Math.round(l.progress * 100)}%` }} />
+              </div>
+            </div>
+          );
+        })()}
         {rank > 0 && (
           <p className="mt-2 text-sm font-bold text-cocoa-soft">
             #{rank} of {ranked.length} pets on Floof{topPct !== null && topPct <= 50 ? ` · Top ${topPct}%` : ""}

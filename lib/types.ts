@@ -52,6 +52,8 @@ export type Pet = {
   pawScore: number;
   postCount?: number; // from the database (cloud mode)
   ownerId?: string | null; // null = Floof house pet
+  birthday?: string; // YYYY-MM-DD
+  gotchaDay?: string; // YYYY-MM-DD
   clan: Clan;
   verified?: boolean;
   bg: string; // avatar background tint
@@ -98,6 +100,7 @@ export type Post = {
   moment?: MomentType;
   slides?: number;
   status?: "pending" | "approved" | "rejected"; // photo check (cloud mode)
+  dailyDate?: string; // YYYY-MM-DD of the Daily Floof prompt this answers
   moderationNote?: string;
 };
 
@@ -141,6 +144,7 @@ export type Meetup = {
   attendees: string[];
   momentType?: MomentType;
   forSpecies?: Species[];
+  recurring?: string; // e.g. "Every 2nd Saturday"
 };
 
 export type Listing = {
@@ -176,4 +180,29 @@ export type Thread = {
   petIds: string[];
   title: string;
   messages: { id: string; from: string; text: string; at: string; ts?: number }[];
+};
+
+export type Reminder = {
+  id: string;
+  title: string;
+  kind: "vaccination" | "flea" | "worming" | "vet" | "grooming" | "medication" | "other";
+  due: string; // YYYY-MM-DD
+  repeat: "none" | "monthly" | "quarterly" | "yearly";
+};
+
+export type Weight = { id: string; date: string; kg: number };
+
+export type LostAlert = {
+  id: string;
+  kind: "lost" | "found";
+  reporterId: string;
+  petId?: string;
+  name: string;
+  description: string;
+  suburb: string;
+  city: string;
+  lastSeen: string;
+  photo?: string;
+  status: "active" | "resolved";
+  createdAt: number;
 };

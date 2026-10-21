@@ -32,6 +32,9 @@ create table if not exists public.pets (
   created_at timestamptz not null default now()
 );
 create index if not exists pets_owner_idx on public.pets (owner_id);
+-- Added later: dates for birthday / Gotcha Day reminders.
+alter table public.pets add column if not exists birthday date;
+alter table public.pets add column if not exists gotcha_day date;
 
 create table if not exists public.posts (
   id text primary key default gen_random_uuid()::text,
@@ -62,6 +65,9 @@ alter table public.posts add column if not exists status text not null default '
 alter table public.posts drop constraint if exists posts_status_check;
 alter table public.posts add constraint posts_status_check check (status in ('pending', 'approved', 'rejected'));
 alter table public.posts add column if not exists moderation_note text;
+-- Added later: which day's Daily Floof prompt this post answers.
+alter table public.posts add column if not exists daily_date date;
+create index if not exists posts_daily_idx on public.posts (daily_date) where daily_date is not null;
 
 create index if not exists posts_created_idx on public.posts (created_at desc);
 create index if not exists posts_pet_idx on public.posts (pet_id);
@@ -295,10 +301,12 @@ from public.biscuit_ledger
 where kind = 'received' and post_id is not null
 group by post_id;
 
-create or replace view public.pet_profiles with (security_invoker = true) as
+-- Recreated (not replaced) because its column list grows over time.
+drop view if exists public.pet_profiles;
+create view public.pet_profiles with (security_invoker = true) as
 select
   p.id, p.owner_id, p.handle, p.name, p.species, p.breed, p.age, p.city, p.bio, p.look,
-  p.photo_url, p.bg, p.clan, p.verified, p.paw_score_base, p.created_at,
+  p.photo_url, p.bg, p.clan, p.verified, p.paw_score_base, p.created_at, p.birthday, p.gotcha_day,
   p.followers_base + (select count(*) from public.follows f where f.followee_id = p.id)::int as followers,
   p.following_base + (select count(*) from public.follows f where f.follower_id = p.id)::int as following,
   p.biscuits_base + coalesce((select t.received_net from public.pet_biscuit_totals t where t.pet_id = p.id), 0) as biscuits_received,
@@ -396,6 +404,9 @@ as $$
 begin
   if auth.uid() is not null then
     new.boops_base := 0; new.biscuits_base := 0; new.comments_base := 0;
+    if new.daily_date is not null and new.daily_date not between current_date - 1 and current_date + 1 then
+      new.daily_date := null;
+    end if;
     if tg_op = 'INSERT' then
       new.created_at := now();
       new.status := case when new.image_url is not null or cardinality(new.image_urls) > 0 then 'pending' else 'approved' end;
@@ -542,3 +553,140 @@ begin
     alter publication supabase_realtime add table public.messages;
   end if;
 end $$;
+
+
+-- ===========================================================================
+-- Engagement features (added later)
+-- ===========================================================================
+
+-- Daily Floof votes: one vote per pet per day, for someone else's answer to that day's prompt.
+create table if not exists public.daily_votes (
+  day date not null,
+  voter_id text not null references public.pets (id) on delete cascade,
+  post_id text not null references public.posts (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (day, voter_id)
+);
+create index if not exists daily_votes_post_idx on public.daily_votes (post_id);
+
+-- Private pet-care reminders (vaccinations, flea treatment, vet check-ups...).
+create table if not exists public.reminders (
+  id uuid primary key default gen_random_uuid(),
+  pet_id text not null references public.pets (id) on delete cascade,
+  title text not null check (char_length(title) between 1 and 80),
+  kind text not null default 'other',
+  due_date date not null,
+  repeat text not null default 'none' check (repeat in ('none', 'monthly', 'quarterly', 'yearly')),
+  created_at timestamptz not null default now()
+);
+create index if not exists reminders_pet_idx on public.reminders (pet_id, due_date);
+
+-- Private weight / growth log.
+create table if not exists public.pet_weights (
+  id uuid primary key default gen_random_uuid(),
+  pet_id text not null references public.pets (id) on delete cascade,
+  measured_on date not null default current_date,
+  kg numeric(6, 2) not null check (kg > 0 and kg < 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists pet_weights_pet_idx on public.pet_weights (pet_id, measured_on);
+
+-- Lost & found alerts, visible to everyone.
+create table if not exists public.lost_alerts (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('lost', 'found')),
+  reporter_id text not null references public.pets (id) on delete cascade,
+  pet_id text references public.pets (id) on delete set null, -- the missing pet, when it's on Floof
+  name text not null check (char_length(name) between 1 and 60),
+  description text not null default '' check (char_length(description) <= 600),
+  suburb text not null default '',
+  city text not null default '',
+  last_seen text not null default '',
+  photo_url text,
+  status text not null default 'active' check (status in ('active', 'resolved')),
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists lost_alerts_status_idx on public.lost_alerts (status, created_at desc);
+
+-- Phone/browser push subscriptions.
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  pet_id text references public.pets (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.daily_votes enable row level security;
+alter table public.reminders enable row level security;
+alter table public.pet_weights enable row level security;
+alter table public.lost_alerts enable row level security;
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists floof_daily_votes_read on public.daily_votes;
+drop policy if exists floof_daily_votes_insert on public.daily_votes;
+drop policy if exists floof_daily_votes_update on public.daily_votes;
+drop policy if exists floof_daily_votes_delete on public.daily_votes;
+create policy floof_daily_votes_read on public.daily_votes for select using (true);
+create policy floof_daily_votes_insert on public.daily_votes for insert to authenticated with check (
+  public.owns_pet(voter_id)
+  and exists (select 1 from public.posts x where x.id = post_id and x.daily_date = day and x.pet_id <> voter_id and x.status = 'approved')
+);
+create policy floof_daily_votes_update on public.daily_votes for update to authenticated using (public.owns_pet(voter_id)) with check (
+  public.owns_pet(voter_id)
+  and exists (select 1 from public.posts x where x.id = post_id and x.daily_date = day and x.pet_id <> voter_id and x.status = 'approved')
+);
+create policy floof_daily_votes_delete on public.daily_votes for delete to authenticated using (public.owns_pet(voter_id));
+
+drop policy if exists floof_reminders_all on public.reminders;
+create policy floof_reminders_all on public.reminders for all to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
+
+drop policy if exists floof_weights_all on public.pet_weights;
+create policy floof_weights_all on public.pet_weights for all to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
+
+drop policy if exists floof_lost_read on public.lost_alerts;
+drop policy if exists floof_lost_insert on public.lost_alerts;
+drop policy if exists floof_lost_update on public.lost_alerts;
+drop policy if exists floof_lost_delete on public.lost_alerts;
+create policy floof_lost_read on public.lost_alerts for select using (true);
+create policy floof_lost_insert on public.lost_alerts for insert to authenticated
+  with check (public.owns_pet(reporter_id) and (pet_id is null or public.owns_pet(pet_id)) and status = 'active');
+create policy floof_lost_update on public.lost_alerts for update to authenticated using (public.owns_pet(reporter_id)) with check (public.owns_pet(reporter_id));
+create policy floof_lost_delete on public.lost_alerts for delete to authenticated using (public.owns_pet(reporter_id));
+
+drop policy if exists floof_push_select on public.push_subscriptions;
+drop policy if exists floof_push_insert on public.push_subscriptions;
+drop policy if exists floof_push_update on public.push_subscriptions;
+drop policy if exists floof_push_delete on public.push_subscriptions;
+create policy floof_push_select on public.push_subscriptions for select to authenticated using (user_id = auth.uid());
+create policy floof_push_insert on public.push_subscriptions for insert to authenticated with check (user_id = auth.uid() and (pet_id is null or public.owns_pet(pet_id)));
+create policy floof_push_update on public.push_subscriptions for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid() and (pet_id is null or public.owns_pet(pet_id)));
+create policy floof_push_delete on public.push_subscriptions for delete to authenticated using (user_id = auth.uid());
+
+grant select on public.daily_votes, public.lost_alerts to anon, authenticated;
+grant insert, update, delete on public.daily_votes, public.lost_alerts to authenticated;
+grant select, insert, update, delete on public.reminders, public.pet_weights, public.push_subscriptions to authenticated;
+
+-- A warm welcome: when a new member posts their first floof, the Floof crew (Mochi) says hi.
+create or replace function public.welcome_first_post()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (select 1 from public.pets where id = new.pet_id and owner_id is not null)
+     and exists (select 1 from public.pets where id = 'mochi' and owner_id is null)
+     and (select count(*) from public.posts where pet_id = new.pet_id) = 1 then
+    insert into public.boops (post_id, pet_id) values (new.id, 'mochi') on conflict do nothing;
+    insert into public.comments (post_id, pet_id, text)
+    values (new.id, 'mochi', 'Welcome to Floof from the Floof crew! 🐾 So happy you''re here.');
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists posts_welcome_first on public.posts;
+create trigger posts_welcome_first after insert on public.posts for each row execute function public.welcome_first_post();

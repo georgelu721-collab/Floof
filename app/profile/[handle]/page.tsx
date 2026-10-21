@@ -21,7 +21,7 @@ const TABS = [
 export default function Profile() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
-  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready, cloud } = useStore();
+  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready, cloud, level, streak, alerts } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("floofs");
   const [sheet, setSheet] = useState(false);
   const pet = pets.find((p) => p.handle === decodeURIComponent(handle));
@@ -51,7 +51,12 @@ export default function Profile() {
     moments: moments.map((p) => p.moment!) as MomentType[],
     clan: isMe ? !!s.clan : true,
     friends: friends.length,
+    bestStreak: isMe ? streak.best : 0,
+    dailyAnswers: theirPosts.filter((p) => p.dailyDate).length,
+    helped: isMe && alerts.some((a) => a.reporterId === me.id && a.kind === "found"),
+    careReminders: isMe ? s.reminders.length : 0,
   }).filter((b) => b.earned);
+  const lvl = level(pet.id);
   const latestMoment = moments[0];
 
   return (
@@ -66,17 +71,9 @@ export default function Profile() {
         back={!isMe}
         right={
           isMe && (
-            <button
-              className="rounded-full p-2 hover:bg-sand"
-              aria-label="Settings / log out"
-              onClick={() => {
-                if (confirm("Log out of Floof?")) {
-                  void dispatch({ t: "logout" }).then(() => router.push("/"));
-                }
-              }}
-            >
+            <Link href="/settings/profile" className="rounded-full p-2 hover:bg-sand" aria-label="Settings">
               <IconSettings />
-            </button>
+            </Link>
           )
         }
       />
@@ -98,6 +95,9 @@ export default function Profile() {
         <h2 className="mt-3 flex items-center gap-1 font-display text-xl font-semibold">
           {pet.name} <span className="text-blush">♡</span>
           {pet.clan && <span className="ml-1 rounded-full bg-sand px-2 py-0.5 text-[11px] font-extrabold">{pet.clan === "cats" ? "🐱 Team Cats" : "🐶 Team Dogs"}</span>}
+          <Link href={`/pawscore/${pet.handle}`} className="rounded-full bg-[#FFF1C9] px-2 py-0.5 text-[11px] font-extrabold">
+            Lv {lvl.level} · {lvl.tier}
+          </Link>
         </h2>
         <p className="text-sm font-semibold text-muted">
           {pet.breed} · {pet.age} · {pet.city}
@@ -134,13 +134,24 @@ export default function Profile() {
         </div>
 
         {isMe ? (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link href="/wallet" className="btn btn-soft !py-2.5">
-              <BiscuitIcon size={18} /> {pet.biscuitsReceived} received
+          <div className="mt-4 space-y-2">
+            <Link href="/settings/profile" className="btn btn-soft w-full !py-2.5">
+              Edit profile
             </Link>
-            <Link href="/moments" className="btn btn-soft !py-2.5">
-              ✨ Moments
-            </Link>
+            <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-extrabold">
+              <Link href="/wallet" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <BiscuitIcon size={20} /> {pet.biscuitsReceived}
+              </Link>
+              <Link href="/moments" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <span className="text-lg leading-5">✨</span> Moments
+              </Link>
+              <Link href="/care" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <span className="text-lg leading-5">🩺</span> Care
+              </Link>
+              <Link href="/recap" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <span className="text-lg leading-5">📊</span> Recap
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-[1fr_1fr_auto] gap-2">

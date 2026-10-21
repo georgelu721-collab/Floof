@@ -80,7 +80,7 @@ export default function Meetups() {
                   <p className="text-[11px] font-extrabold uppercase tracking-wide text-blush">{m.kind}</p>
                   <p className="truncate font-extrabold">{m.title}</p>
                   <p className="flex items-center gap-1 text-xs font-semibold text-muted">
-                    <IconCalendar size={13} /> {m.date} · {m.time}
+                    <IconCalendar size={13} /> {m.date} · {m.time}{m.recurring ? ` · 🔁 ${m.recurring}` : ""}
                   </p>
                   <p className="flex items-center gap-1 truncate text-xs font-semibold text-muted">
                     <IconPin size={13} /> {m.place}

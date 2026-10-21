@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AFFINITY, DEMO_PET_ID, PETS, POSTS } from "./data";
+import { AFFINITY, DEMO_ALERTS, DEMO_PET_ID, demoReminders, PETS, POSTS } from "./data";
 import { CLOUD, sb } from "./supabase";
-import { loadSnapshot, moderatePost, remote, subscribeToMessages, type Snapshot } from "./cloud";
-import type { Clan, Comment, LedgerEntry, MomentType, Pet, Post, Thread } from "./types";
+import { loadSnapshot, moderatePost, remote, subscribeToMessages, uploadPhoto, type Snapshot } from "./cloud";
+import { addDays, dailyStreak, dayKey, fromKey, levelFor, postingStreak } from "./daily";
+import type { Clan, Comment, LedgerEntry, LostAlert, MomentType, Pet, Post, Reminder, Thread, Weight } from "./types";
 
 type State = {
   me: string | null;
@@ -29,6 +30,13 @@ type State = {
   threads: Record<string, Thread["messages"]>;
   unlocked: Partial<Record<MomentType, string>>; // moment -> postId
   deleted: Record<string, true>;
+  dailyVotes: Record<string, string>; // day -> post I voted for
+  interactionDays: Record<string, string[]>; // pet -> days I interacted with them
+  reminders: Reminder[];
+  weights: Weight[];
+  alerts: LostAlert[]; // local demo alerts, plus ones I just posted (cloud)
+  resolvedAlerts: Record<string, true>;
+  meEdits: Partial<Pet>; // local demo: edits to a built-in pet
 };
 
 const initial: State = {
@@ -54,12 +62,19 @@ const initial: State = {
   threads: {},
   unlocked: {},
   deleted: {},
+  dailyVotes: {},
+  interactionDays: {},
+  reminders: [],
+  weights: [],
+  alerts: [],
+  resolvedAlerts: {},
+  meEdits: {},
 };
 
 export type Action =
   | { t: "hydrate"; s: Partial<State> }
   | { t: "login"; id: string }
-  | { t: "createPet"; pet: Pet }
+  | { t: "createPet"; pet: Pet; follow?: string[]; packs?: string[] }
   | { t: "logout" }
   | { t: "boop"; postId: string; petId: string }
   | { t: "save"; postId: string }
@@ -80,9 +95,32 @@ export type Action =
   | { t: "meetupsOptIn"; on: boolean }
   | { t: "message"; threadId: string; text: string; petIds: string[] }
   | { t: "incoming"; threadId: string; msg: Thread["messages"][number]; petId: string }
-  | { t: "updateMe"; patch: Partial<Pet> };
+  | { t: "updateMe"; patch: Partial<Pet> }
+  | { t: "dailyVote"; day: string; postId: string | null; petId: string }
+  | { t: "addReminder"; reminder: Reminder }
+  | { t: "completeReminder"; id: string }
+  | { t: "deleteReminder"; id: string }
+  | { t: "addWeight"; weight: Weight }
+  | { t: "deleteWeight"; id: string }
+  | { t: "postAlert"; alert: LostAlert }
+  | { t: "resolveAlert"; id: string };
 
 const bump = (m: Record<string, number>, id: string, n: number) => ({ ...m, [id]: (m[id] ?? 0) + n });
+/** Remember that I interacted with a pet today (for best-friend streaks). */
+const touch = (days: Record<string, string[]>, id: string) => {
+  const today = dayKey();
+  const list = days[id] ?? [];
+  return list.includes(today) ? days : { ...days, [id]: [...list, today] };
+};
+const PERIOD: Record<Reminder["repeat"], number> = { none: 0, monthly: 1, quarterly: 3, yearly: 12 };
+/** Next due date after today for a repeating reminder. */
+function nextDue(r: Reminder) {
+  const d = fromKey(r.due);
+  const today = dayKey();
+  do d.setMonth(d.getMonth() + PERIOD[r.repeat]);
+  while (dayKey(d) <= today);
+  return dayKey(d);
+}
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function reducer(s: State, a: Action): State {
@@ -92,7 +130,19 @@ function reducer(s: State, a: Action): State {
     case "login":
       return { ...s, me: a.id };
     case "createPet":
-      return { ...s, customPets: [...s.customPets.filter((p) => p.id !== a.pet.id), a.pet], me: a.pet.id };
+      return {
+        ...s,
+        customPets: [...s.customPets.filter((p) => p.id !== a.pet.id), a.pet],
+        me: a.pet.id,
+        following: a.follow ? Object.fromEntries(a.follow.map((id) => [id, true as const])) : s.following,
+        packs: a.packs ? Object.fromEntries(a.packs.map((id) => [id, true as const])) : s.packs,
+        clan: a.pet.clan,
+        // A new pet starts with a clean slate (the demo's sample care data belongs to Big Mac).
+        reminders: [],
+        weights: [],
+        dailyVotes: {},
+        interactionDays: {},
+      };
     case "logout":
       return { ...s, me: null };
     case "boop": {
@@ -100,7 +150,7 @@ function reducer(s: State, a: Action): State {
       const boops = { ...s.boops };
       if (on) boops[a.postId] = true;
       else delete boops[a.postId];
-      return { ...s, boops, interactions: bump(s.interactions, a.petId, on ? 1 : -1) };
+      return { ...s, boops, interactions: bump(s.interactions, a.petId, on ? 1 : -1), interactionDays: on ? touch(s.interactionDays, a.petId) : s.interactionDays };
     }
     case "save": {
       const saved = { ...s.saved };
@@ -120,6 +170,7 @@ function reducer(s: State, a: Action): State {
         ...s,
         comments: { ...s.comments, [a.postId]: [...(s.comments[a.postId] ?? []), c] },
         interactions: bump(s.interactions, a.petId, 2),
+        interactionDays: touch(s.interactionDays, a.petId),
       };
     }
     case "post": {
@@ -135,6 +186,7 @@ function reducer(s: State, a: Action): State {
         balance: s.balance - a.amount,
         ledger: [{ id: uid(), type: "sent", amount: a.amount, petId: a.petId, note: a.note, at: Date.now() }, ...s.ledger],
         interactions: bump(s.interactions, a.petId, 5 * a.amount),
+        interactionDays: touch(s.interactionDays, a.petId),
       };
     case "topup":
       return {
@@ -175,8 +227,12 @@ function reducer(s: State, a: Action): State {
     case "message": {
       const msg = { id: uid(), from: "me", text: a.text, at: "now", ts: Date.now() };
       let interactions = s.interactions;
-      for (const p of a.petIds) interactions = bump(interactions, p, 1);
-      return { ...s, threads: { ...s.threads, [a.threadId]: [...(s.threads[a.threadId] ?? []), msg] }, interactions };
+      let interactionDays = s.interactionDays;
+      for (const p of a.petIds) {
+        interactions = bump(interactions, p, 1);
+        interactionDays = touch(interactionDays, p);
+      }
+      return { ...s, threads: { ...s.threads, [a.threadId]: [...(s.threads[a.threadId] ?? []), msg] }, interactions, interactionDays };
     }
     case "incoming":
       if ((s.threads[a.threadId] ?? []).some((m) => m.id === a.msg.id)) return s;
@@ -186,7 +242,38 @@ function reducer(s: State, a: Action): State {
         interactions: bump(s.interactions, a.petId, 1),
       };
     case "updateMe":
-      return { ...s, customPets: s.customPets.map((p) => (p.id === s.me ? { ...p, ...a.patch } : p)) };
+      return s.customPets.some((p) => p.id === s.me)
+        ? { ...s, customPets: s.customPets.map((p) => (p.id === s.me ? { ...p, ...a.patch } : p)) }
+        : { ...s, meEdits: { ...s.meEdits, ...a.patch } };
+    case "dailyVote": {
+      const dailyVotes = { ...s.dailyVotes };
+      if (a.postId) dailyVotes[a.day] = a.postId;
+      else delete dailyVotes[a.day];
+      return { ...s, dailyVotes, interactionDays: a.postId ? touch(s.interactionDays, a.petId) : s.interactionDays };
+    }
+    case "addReminder":
+      return { ...s, reminders: [...s.reminders, a.reminder].sort((x, y) => x.due.localeCompare(y.due)) };
+    case "completeReminder":
+      return {
+        ...s,
+        reminders: s.reminders
+          .flatMap((r) => (r.id !== a.id ? [r] : r.repeat === "none" ? [] : [{ ...r, due: nextDue(r) }]))
+          .sort((x, y) => x.due.localeCompare(y.due)),
+      };
+    case "deleteReminder":
+      return { ...s, reminders: s.reminders.filter((r) => r.id !== a.id) };
+    case "addWeight":
+      return { ...s, weights: [...s.weights, a.weight].sort((x, y) => x.date.localeCompare(y.date)) };
+    case "deleteWeight":
+      return { ...s, weights: s.weights.filter((w) => w.id !== a.id) };
+    case "postAlert":
+      return { ...s, alerts: [a.alert, ...s.alerts] };
+    case "resolveAlert":
+      return {
+        ...s,
+        alerts: s.alerts.map((x) => (x.id === a.id ? { ...x, status: "resolved" as const } : x)),
+        resolvedAlerts: { ...s.resolvedAlerts, [a.id]: true },
+      };
   }
 }
 
@@ -227,8 +314,38 @@ async function syncAction(a: Action, before: State, me: string) {
       return remote.updatePet(me, { meetups_opt_in: a.on });
     case "message":
       return remote.message(me, a.petIds[0], a.text);
-    case "updateMe":
-      return remote.updatePet(me, { name: a.patch.name, bio: a.patch.bio });
+    case "updateMe": {
+      const photo = a.patch.photo?.startsWith("data:") ? await uploadPhoto(a.patch.photo, "avatar") : a.patch.photo;
+      const patch: Parameters<typeof remote.updatePet>[1] = {};
+      if (a.patch.name !== undefined) patch.name = a.patch.name;
+      if (a.patch.bio !== undefined) patch.bio = a.patch.bio;
+      if (a.patch.breed !== undefined) patch.breed = a.patch.breed;
+      if (a.patch.age !== undefined) patch.age = a.patch.age;
+      if (a.patch.city !== undefined) patch.city = a.patch.city;
+      if ("birthday" in a.patch) patch.birthday = a.patch.birthday || null;
+      if ("gotchaDay" in a.patch) patch.gotcha_day = a.patch.gotchaDay || null;
+      if ("photo" in a.patch) patch.photo_url = photo ?? null;
+      return remote.updatePet(me, patch);
+    }
+    case "dailyVote":
+      return remote.dailyVote(a.day, me, a.postId);
+    case "addReminder":
+      return remote.addReminder(me, a.reminder);
+    case "completeReminder": {
+      const r = before.reminders.find((x) => x.id === a.id);
+      if (!r) return;
+      return r.repeat === "none" ? remote.deleteReminder(r.id) : remote.updateReminder({ ...r, due: nextDue(r) });
+    }
+    case "deleteReminder":
+      return remote.deleteReminder(a.id);
+    case "addWeight":
+      return remote.addWeight(me, a.weight);
+    case "deleteWeight":
+      return remote.deleteWeight(a.id);
+    case "postAlert":
+      return remote.postAlert(a.alert);
+    case "resolveAlert":
+      return remote.resolveAlert(a.id);
   }
 }
 
@@ -276,6 +393,16 @@ type Ctx = {
   toast: (msg: string) => void;
   toastMsg: string | null;
   loadError: string | null;
+  /** My posting streak (one free skip per week). */
+  streak: { streak: number; postedToday: boolean; atRisk: boolean; best: number };
+  /** Consecutive days I've interacted with a pet. */
+  friendStreak: (petId: string) => number;
+  interactedToday: (petId: string) => boolean;
+  dailyAnswers: (day: string) => Post[];
+  dailyVoteCount: (day: string, postId: string) => number;
+  alerts: LostAlert[];
+  level: (petId: string) => ReturnType<typeof levelFor>;
+  myPostDays: Set<string>;
 };
 
 export type PawPart = { key: string; emoji: string; label: string; count: number; per: number; points: number };
@@ -285,7 +412,21 @@ const StoreCtx = createContext<Ctx | null>(null);
 const LOGIN_FREE = new Set<Action["t"]>(["hydrate", "login", "logout", "incoming"]);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [s, rawDispatch] = useReducer(reducer, CLOUD ? { ...initial, balance: 0, ledger: [], following: {}, packs: {} } : initial);
+  const [s, rawDispatch] = useReducer(
+    reducer,
+    CLOUD
+      ? { ...initial, balance: 0, ledger: [], following: {}, packs: {} }
+      : {
+          ...initial,
+          alerts: DEMO_ALERTS,
+          reminders: demoReminders(dayKey()),
+          weights: [
+            { id: "demo-w1", date: addDays(dayKey(), -60), kg: 31.2 },
+            { id: "demo-w2", date: addDays(dayKey(), -30), kg: 31.8 },
+            { id: "demo-w3", date: addDays(dayKey(), -3), kg: 32.1 },
+          ],
+        },
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -402,7 +543,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
       if (a.t === "createPet") {
         try {
-          await remote.createPet(a.pet);
+          const newId = await remote.createPet(a.pet);
+          // Starter follows and packs picked during sign-up (best effort).
+          await Promise.allSettled([
+            ...(a.follow ?? []).map((id) => remote.follow(true, newId, id)),
+            ...(a.packs ?? []).map((id) => remote.pack(true, id, newId)),
+          ]);
           await reload();
           return true;
         } catch (e) {
@@ -424,6 +570,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (LOGIN_FREE.has(a.t) || a.t === "clanFloof") return true;
       try {
         await syncAction(a, before, me!);
+        if (a.t === "updateMe" || a.t === "postAlert") void reload();
         if (a.t === "post" && hasPhotos) {
           // Check the photos for a pet, then refresh so the post shows its result.
           void moderatePost(a.post.id).then((r) => {
@@ -452,7 +599,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const cloudGuest = CLOUD && !s.me;
     const meId = CLOUD ? (s.me ?? GUEST.id) : (s.me ?? DEMO_PET_ID);
     const meBase = cloudGuest ? GUEST : (pet(meId) ?? (CLOUD ? GUEST : PETS[0]));
-    const me: Pet = { ...meBase, biscuitsReceived: meBase.biscuitsReceived + s.received, clan: s.clan ?? meBase.clan };
+    const me: Pet = {
+      ...meBase,
+      ...(CLOUD ? {} : s.meEdits),
+      biscuitsReceived: meBase.biscuitsReceived + s.received,
+      clan: s.clan ?? meBase.clan,
+    };
 
     const allPosts = CLOUD ? [...s.myPosts.filter((p) => !snap?.posts.some((x) => x.id === p.id)), ...(snap?.posts ?? [])] : [...s.myPosts, ...POSTS];
     const posts = allPosts.filter((p) => !s.deleted[p.id]).map((p) => {
@@ -461,6 +613,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
     const post = (id: string) => posts.find((p) => p.id === id);
 
+    const today = dayKey();
+    const daysWith = (id: string) => new Set([...(snap?.mine?.interactionDays[id] ?? []), ...(s.interactionDays[id] ?? [])]);
+    const friendStreak = (id: string) => dailyStreak(daysWith(id), today);
+    const interactedToday = (id: string) => daysWith(id).has(today);
+
     const bestFriends = (petId: string) => {
       const seed = AFFINITY[petId] ?? (petId === meId ? { mochi: { score: 12, streak: 2 }, luna: { score: 8, streak: 1 } } : {});
       const map: Record<string, { score: number; streak: number }> = {};
@@ -468,8 +625,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (petId === meId) {
         for (const [id, n] of Object.entries(s.interactions)) {
           if (id === meId) continue;
-          map[id] = { score: (map[id]?.score ?? 0) + n, streak: map[id]?.streak ?? (n > 0 ? 1 : 0) };
+          map[id] = { score: (map[id]?.score ?? 0) + n, streak: map[id]?.streak ?? 0 };
         }
+        // Real streaks from actual activity (cloud), or the demo's sample streaks topped up by real ones (local).
+        for (const id of Object.keys(map)) map[id].streak = CLOUD ? friendStreak(id) : Math.max(map[id].streak, friendStreak(id));
       }
       return Object.entries(map)
         .map(([id, v]) => ({ pet: pet(id)!, ...v }))
@@ -510,6 +669,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       snap ? (snap.voteCounts[compId]?.[postId] ?? 0) - (snap.initialVotes[compId] === postId ? 1 : 0) : 0;
     const remoteEntries = (compId: string) => snap?.entries[compId] ?? [];
 
+    const myPostDays = new Set<string>([
+      ...(snap?.mine?.myPostDays ?? []),
+      ...posts.filter((p) => p.petId === meId && p.createdAt).map((p) => dayKey(new Date(p.createdAt))),
+    ]);
+    const streak = postingStreak(myPostDays, today);
+
+    const dailyAnswers = (day: string) =>
+      posts.filter((p) => p.dailyDate === day && (p.status === undefined || p.status === "approved" || p.petId === meId));
+    const dailyVoteCount = (day: string, postId: string) => {
+      const counted = snap?.dailyVoteCounts[day]?.[postId] ?? 0;
+      const wasMine = snap?.mine?.dailyVotes[day] === postId ? 1 : 0;
+      const isMine = s.dailyVotes[day] === postId ? 1 : 0;
+      return counted - wasMine + isMine;
+    };
+
+    const baseAlerts = CLOUD ? [...s.alerts.filter((a) => !snap?.alerts.some((x) => x.id === a.id)), ...(snap?.alerts ?? [])] : s.alerts;
+    const alerts = baseAlerts.map((a) => (s.resolvedAlerts[a.id] ? { ...a, status: "resolved" as const } : a));
+
     return {
       s,
       ready,
@@ -532,6 +709,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toast,
       toastMsg,
       loadError,
+      streak,
+      friendStreak,
+      interactedToday,
+      dailyAnswers,
+      dailyVoteCount,
+      alerts,
+      level: (id: string) => levelFor(pawScore(id)),
+      myPostDays,
     };
   }, [s, ready, snap, dispatch, reload, toast, toastMsg, loadError]);
 

@@ -9,6 +9,7 @@ import { PostCard } from "@/components/PostCard";
 import { Page } from "@/components/Shell";
 import { BiscuitIcon, IconBell, IconChat, PawIcon } from "@/components/Icons";
 import { ClanWarMini } from "@/components/ClanWar";
+import { DailyCard, Nudges, StarterChecklist } from "@/components/HomeCards";
 
 const TABS = ["For you", "Following", "Moments"] as const;
 
@@ -60,6 +61,14 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      {!loadError && ready && (
+        <>
+          <StarterChecklist />
+          <DailyCard />
+          <Nudges />
+        </>
+      )}
 
       <div className="flex gap-2 px-4 pb-2">
         {TABS.map((t) => (

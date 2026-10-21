@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { COMPETITIONS, compact } from "@/lib/data";
+import { compact } from "@/lib/data";
+import { allCompetitions } from "@/lib/daily";
 import { useStore } from "@/lib/store";
 import { PetAvatar, PetScene, PostMedia } from "@/components/PetArt";
 import { Page, SectionTitle, TopBar } from "@/components/Shell";
@@ -13,7 +14,7 @@ export default function CompetitionPage() {
   const { id } = useParams<{ id: string }>();
   const { pet, post, posts, me, s, dispatch, toast, extraVotes, remoteEntries } = useStore();
   const [picking, setPicking] = useState(false);
-  const c = COMPETITIONS.find((x) => x.id === id);
+  const c = allCompetitions().find((x) => x.id === id);
   if (!c) return <TopBar title="Competition not found" />;
   const hero = pet(c.heroPetId)!;
 

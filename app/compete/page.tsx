@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { COMPETITIONS, MEETUPS, compact } from "@/lib/data";
+import { MEETUPS, compact } from "@/lib/data";
+import { allCompetitions } from "@/lib/daily";
 import { useStore } from "@/lib/store";
 import { PetAvatar, PetScene } from "@/components/PetArt";
 import { Page, SectionTitle } from "@/components/Shell";
@@ -47,13 +48,14 @@ export default function Compete() {
         ))}
       </div>
       <div className="space-y-3 px-4">
-        {COMPETITIONS.filter((c) => c.status === tab).map((c) => {
+        {allCompetitions().filter((c) => c.status === tab).map((c) => {
           const hero = pet(c.heroPetId)!;
           return (
             <Link key={c.id} href={`/competitions/${c.id}`} className="relative block h-40 overflow-hidden rounded-3xl">
               <PetScene usePhoto pet={hero} scene={c.scene} accessory={c.accessory} className="absolute inset-0 h-full w-full" />
               <div className="absolute inset-0 bg-gradient-to-r from-cocoa/85 via-cocoa/50 to-transparent" />
               <div className="relative flex h-full max-w-[65%] flex-col justify-center p-5 text-white">
+                {c.id.startsWith("season-") && <span className="mb-1 w-max rounded-full bg-butter px-2 py-0.5 text-[10px] font-extrabold uppercase text-cocoa">This month</span>}
                 <h3 className="font-display text-xl font-semibold leading-tight">{c.title}</h3>
                 <p className="mt-1 text-sm font-semibold text-white/80">
                   {c.status === "active" ? `Ends in ${c.endsInDays} days` : c.status === "upcoming" ? `Starts in ${c.endsInDays} days` : `Winner: ${pet(c.winnerPetId!)?.name}`}
@@ -83,7 +85,7 @@ export default function Compete() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-extrabold">{m.title}</p>
                 <p className="flex items-center gap-1 text-xs font-semibold text-muted">
-                  <IconCalendar size={13} /> {m.date} · {m.time}
+                  <IconCalendar size={13} /> {m.date} · {m.time}{m.recurring ? ` · 🔁 ${m.recurring}` : ""}
                 </p>
                 <p className="flex items-center gap-1 truncate text-xs font-semibold text-muted">
                   <IconPin size={13} /> {m.place} · {compact(m.interested)} interested

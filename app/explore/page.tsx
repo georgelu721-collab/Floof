@@ -63,15 +63,18 @@ function ExploreInner() {
 
       {!query && (
         <div className="grid grid-cols-3 gap-2 px-4 py-3">
-          <Link href="/marketplace" className="card flex flex-col items-center gap-1 p-3 text-center text-xs font-extrabold">
-            <IconShop className="text-peach" /> Marketplace
-          </Link>
-          <Link href="/meetups" className="card flex flex-col items-center gap-1 p-3 text-center text-xs font-extrabold">
-            <IconUsers className="text-sage" /> Meetups
-          </Link>
-          <Link href="/friends" className="card flex flex-col items-center gap-1 p-3 text-center text-xs font-extrabold">
-            <IconHeart className="text-blush" /> Best Friends
-          </Link>
+          {[
+            { href: "/daily", emoji: "📅", label: "Daily Floof" },
+            { href: "/lost", emoji: "🚨", label: "Lost & Found" },
+            { href: "/care", emoji: "🩺", label: "Pet care" },
+            { href: "/marketplace", emoji: "🛍️", label: "Marketplace" },
+            { href: "/meetups", emoji: "📍", label: "Meetups" },
+            { href: "/friends", emoji: "💛", label: "Best Friends" },
+          ].map((t) => (
+            <Link key={t.href} href={t.href} className="card flex flex-col items-center gap-1 p-3 text-center text-xs font-extrabold">
+              <span className="text-xl">{t.emoji}</span> {t.label}
+            </Link>
+          ))}
         </div>
       )}
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loadNotifications } from "@/lib/cloud";
 import type { Notification } from "@/lib/types";
-import { NOTIFICATIONS } from "@/lib/data";
+import { dmKey, NOTIFICATIONS } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { PetAvatar, PostMedia } from "@/components/PetArt";
 import { Page, TopBar } from "@/components/Shell";
@@ -18,8 +18,12 @@ const FILTERS = [
 ] as const;
 
 export default function Notifications() {
-  const { pet, post, s, dispatch, me, cloud, signedIn } = useStore();
+  const { pet, post, s, dispatch, me, cloud, signedIn, alerts, toast } = useStore();
   const [f, setF] = useState<(typeof FILTERS)[number]["id"]>("all");
+  const [thanked, setThanked] = useState<Record<string, true>>({});
+  const nearbyAlerts = alerts.filter(
+    (a) => a.status === "active" && a.reporterId !== me.id && (!me.city || !a.city || a.city.toLowerCase() === me.city.toLowerCase()),
+  );
   const [live, setLive] = useState<Notification[] | null>(null);
   useEffect(() => {
     if (!cloud || !signedIn) return;
@@ -38,6 +42,21 @@ export default function Notifications() {
           </button>
         ))}
       </div>
+      {f === "all" && nearbyAlerts.length > 0 && (
+        <div className="space-y-2 px-4 pb-2">
+          {nearbyAlerts.slice(0, 3).map((a) => (
+            <Link key={a.id} href={`/lost/${a.id}`} className="flex items-center gap-3 rounded-2xl bg-blush-soft px-4 py-3">
+              <span className="text-2xl">{a.kind === "lost" ? "🚨" : "🏠"}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-extrabold">
+                  {a.kind === "lost" ? "Lost" : "Found"} near you: {a.name}
+                </span>
+                <span className="block truncate text-xs font-semibold text-cocoa-soft">{[a.suburb, a.city].filter(Boolean).join(", ")} · tap to help</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
       <ul className="space-y-1 px-4">
         {list.map((n) => {
           const p = n.kind === "trending" ? me : pet(n.petId);
@@ -63,6 +82,28 @@ export default function Notifications() {
                 >
                   {s.following[p.id] ? "Following" : "Follow back"}
                 </button>
+              ) : n.kind === "biscuit" ? (
+                thanked[n.id] ? (
+                  <span className="rounded-full bg-[#E2F0DA] px-3 py-1.5 text-xs font-extrabold text-[#4F7A3E]">Thanked ✓</span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const ok = await dispatch({
+                        t: "message",
+                        threadId: dmKey(p.id, cloud),
+                        text: `Thank you for the biscuits! 🍪💛 — ${me.name}`,
+                        petIds: [p.id],
+                      });
+                      if (ok) {
+                        setThanked((t) => ({ ...t, [n.id]: true }));
+                        toast(`Thanks sent to ${p.name} 💛`);
+                      }
+                    }}
+                    className="rounded-full bg-[#FFF1E0] px-3 py-1.5 text-xs font-extrabold"
+                  >
+                    Say thanks
+                  </button>
+                )
               ) : n.kind === "pack" ? (
                 <Link href="/meetups" className="rounded-full bg-sand px-3 py-1.5 text-xs font-extrabold">
                   View

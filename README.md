@@ -50,6 +50,21 @@ Add these in **Vercel → Settings → Environment Variables** (server-only, nev
 
 Without them, photo posts stay "checking" (visible only to their owner) and are checked automatically once the keys are added.
 
+### Daily habits & notifications
+
+- **Daily Floof** (`/daily`): one prompt a day, posting streaks (one free skip per week), voting, yesterday's winner.
+- **Pet care** (`/care`): reminders (vaccinations, flea/worming, vet), birthday & Gotcha Day, weight log, "On this day" memories.
+- **Lost & Found** (`/lost`): public alerts for lost/found pets, "I've seen them" messages the reporter.
+- **Weekly recap** (`/recap`), best-friend streak nudges, PawScore levels and badges, weekly Clan War challenges, monthly seasonal contests, a starter checklist and a 4-step sign-up.
+- **Push notifications**: `app/api/cron/daily` runs once a day (see `vercel.json`, 07:00 UTC ≈ 6pm Sydney) and sends the daily prompt or a streak warning, care reminders due today/tomorrow, birthday wishes, and a Sunday recap. Users turn them on in **Edit profile → Notifications**. On iPhone they must first add Floof to the Home Screen.
+
+Extra Vercel environment variables for notifications:
+
+| Variable | Value |
+| --- | --- |
+| `VAPID_PRIVATE_KEY` | The private push key (the public half is in `lib/push-key.ts`). Generate a new pair with `npx web-push generate-vapid-keys` if you ever need to, and update both. |
+| `CRON_SECRET` | Any long random string. Vercel sends it to the cron job automatically, so nobody else can trigger it. |
+
 ### How the data is protected
 
 Every table has row level security: anyone can read public things (pets, posts, boops, comments), but you can only create or change rows for **your own pet**. Saves, messages and the biscuit ledger are private. Biscuits can only move through database functions (`send_biscuits`, `topup_biscuits`, `redeem_biscuits`) that check ownership and balance, so a wallet can't be faked or overspent.

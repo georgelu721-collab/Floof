@@ -43,7 +43,7 @@ export default function MeetupPage() {
         <span className="rounded-full bg-sand px-3 py-1 text-xs font-extrabold capitalize">{m.kind}</span>
         <h1 className="mt-2 font-display text-[28px] font-bold leading-tight">{m.title}</h1>
         <p className="mt-2 flex items-center gap-2 font-semibold">
-          <IconCalendar size={18} /> {m.date} · {m.time}
+          <IconCalendar size={18} /> {m.date} · {m.time}{m.recurring ? ` · 🔁 ${m.recurring}` : ""}
         </p>
         <p className="mt-1 flex items-center gap-2 font-semibold">
           <IconPin size={18} /> {m.place}, {m.suburb}

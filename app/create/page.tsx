@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { MOMENT_TYPES } from "@/lib/data";
+import { addDays, dayKey, promptFor } from "@/lib/daily";
 import { fileToDataUrl } from "@/lib/image";
 import { newId, useStore } from "@/lib/store";
 import type { Accessory, Expression, MomentType, Scene } from "@/lib/types";
@@ -49,6 +50,10 @@ function CreateInner() {
   const { me, dispatch, toast, s, signedIn, ready, cloud } = useStore();
   const initialMoment = params.get("moment") as MomentType | null;
   const validMoment = initialMoment && initialMoment in MOMENT_TYPES ? initialMoment : null;
+  // Answering the Daily Floof prompt (?daily=YYYY-MM-DD, only today or yesterday).
+  const dailyParam = params.get("daily");
+  const dailyDate = dailyParam && (dailyParam === dayKey() || dailyParam === addDays(dayKey(), -1)) ? dailyParam : undefined;
+  const dailyPrompt = dailyDate ? promptFor(dailyDate) : null;
 
   const [photos, setPhotos] = useState<string[]>([]);
   const image = photos[0];
@@ -56,8 +61,9 @@ function CreateInner() {
   const [accessory, setAccessory] = useState<Accessory>("bandana");
   const [expression, setExpression] = useState<Expression>("happy");
   const [overlay, setOverlay] = useState(validMoment ? MOMENT_TYPES[validMoment].title.toLowerCase() + " ♡" : "");
+  const [captionHint] = useState(dailyPrompt ? `${dailyPrompt.emoji} ${dailyPrompt.text}` : "");
   const [caption, setCaption] = useState("");
-  const [tags, setTags] = useState(params.get("tag") ?? (validMoment ? "firstmoment" : ""));
+  const [tags, setTags] = useState(params.get("tag") ?? (validMoment ? "firstmoment" : dailyDate ? "DailyFloof" : ""));
   const [location, setLocation] = useState(me.city ? `${me.city}, Australia` : "");
   const [moment, setMoment] = useState<MomentType | "">(validMoment ?? "");
   const [busy, setBusy] = useState(false);
@@ -75,7 +81,7 @@ function CreateInner() {
         image,
         images: photos.length > 1 ? photos : undefined,
         overlay: overlay.trim() || undefined,
-        caption: caption.trim() || "🐾",
+        caption: caption.trim() || captionHint || "🐾",
         tags: tags
           .split(/[\s,#]+/)
           .map((t) => t.trim())
@@ -87,12 +93,15 @@ function CreateInner() {
         comments: [],
         createdAt: Date.now(),
         moment: moment || undefined,
+        dailyDate,
       },
     });
     toast(
       cloud && photos.length
         ? "Posted! Checking your photo for a pet 🔍"
-        : moment
+        : dailyDate
+          ? "🔥 Daily Floof answered! See you tomorrow"
+          : moment
           ? `${MOMENT_TYPES[moment].emoji} ${MOMENT_TYPES[moment].title} unlocked!`
           : s.clan
             ? "Floof posted! +5 for your clan 🐾"
@@ -118,6 +127,15 @@ function CreateInner() {
     <main className="pb-10">
       <TopBar title="Create a Floof" />
       <div className="px-4">
+        {dailyPrompt && (
+          <div className="mb-3 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#FFE9D2] to-[#FDE4E8] px-4 py-3">
+            <span className="text-3xl">{dailyPrompt.emoji}</span>
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-wider text-cocoa-soft">Daily Floof</p>
+              <p className="font-display text-lg font-semibold leading-tight">{dailyPrompt.text}</p>
+            </div>
+          </div>
+        )}
         <PostMedia
           post={{ scene, accessory, expression, image, images: photos, overlay }}
           pet={me}
@@ -181,7 +199,7 @@ function CreateInner() {
           <input className="input" placeholder="Handwritten sticker text (e.g. zoomies!)" maxLength={28} value={overlay} onChange={(e) => setOverlay(e.target.value)} />
           <textarea
             className="input min-h-24 !rounded-3xl"
-            placeholder="Write a caption…"
+            placeholder={captionHint ? `Caption (optional) — ${captionHint}` : "Write a caption…"}
             value={caption}
             maxLength={300}
             onChange={(e) => setCaption(e.target.value)}
