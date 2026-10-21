@@ -74,7 +74,28 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
         </button>
       </header>
 
-      <div className="relative mx-3 select-none" onClick={onMediaTap}>
+      {post.status === "pending" && (
+        <p className="mx-3 mb-2 rounded-2xl bg-[#FFF1C9] px-4 py-2.5 text-sm font-bold">
+          🔍 Checking for a pet… only you can see this until it&apos;s approved.
+        </p>
+      )}
+      {post.status === "rejected" && (
+        <div className="mx-3 mb-2 flex items-center gap-3 rounded-2xl bg-blush-soft px-4 py-2.5 text-sm font-bold">
+          <p className="flex-1">
+            🚫 Hidden: {post.moderationNote || "we couldn't spot a pet in this photo."} Only you can see it.
+          </p>
+          <button
+            onClick={() => {
+              if (confirm("Delete this post?")) void dispatch({ t: "deletePost", postId: post.id });
+            }}
+            className="shrink-0 rounded-full bg-cocoa px-3 py-1.5 text-xs font-extrabold text-white"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+
+      <div className={`relative mx-3 select-none ${post.status === "rejected" ? "opacity-50" : ""}`} onClick={onMediaTap}>
         <PostMedia post={post} pet={owner} carousel className="aspect-square rounded-[1.6rem]" />
         {burst > 0 && (
           <span key={burst} className="animate-float-up pointer-events-none absolute left-1/2 top-1/2 -ml-10 -mt-10 text-white drop-shadow-lg">

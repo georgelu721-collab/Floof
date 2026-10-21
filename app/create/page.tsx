@@ -46,7 +46,7 @@ const EXPRESSIONS: { id: Expression; label: string }[] = [
 function CreateInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { me, dispatch, toast, s, signedIn, ready } = useStore();
+  const { me, dispatch, toast, s, signedIn, ready, cloud } = useStore();
   const initialMoment = params.get("moment") as MomentType | null;
   const validMoment = initialMoment && initialMoment in MOMENT_TYPES ? initialMoment : null;
 
@@ -89,7 +89,15 @@ function CreateInner() {
         moment: moment || undefined,
       },
     });
-    toast(moment ? `${MOMENT_TYPES[moment].emoji} ${MOMENT_TYPES[moment].title} unlocked!` : s.clan ? "Floof posted! +5 for your clan 🐾" : "Floof posted! 🐾");
+    toast(
+      cloud && photos.length
+        ? "Posted! Checking your photo for a pet 🔍"
+        : moment
+          ? `${MOMENT_TYPES[moment].emoji} ${MOMENT_TYPES[moment].title} unlocked!`
+          : s.clan
+            ? "Floof posted! +5 for your clan 🐾"
+            : "Floof posted! 🐾",
+    );
     router.push("/home");
   };
 

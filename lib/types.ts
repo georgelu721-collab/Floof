@@ -97,6 +97,8 @@ export type Post = {
   ago?: string; // display time for seeded posts
   moment?: MomentType;
   slides?: number;
+  status?: "pending" | "approved" | "rejected"; // photo check (cloud mode)
+  moderationNote?: string;
 };
 
 export type Notification = {

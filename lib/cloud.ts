@@ -41,6 +41,8 @@ type PostRow = {
   tags: string[];
   location: string | null;
   moment: MomentType | null;
+  status: "pending" | "approved" | "rejected" | null;
+  moderation_note: string | null;
   slides: number | null;
   created_at: string;
   boop_count: number;
@@ -240,6 +242,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
     tags: r.tags ?? [],
     location: r.location ?? undefined,
     moment: r.moment ?? undefined,
+    status: r.status ?? "approved",
+    moderationNote: r.moderation_note ?? undefined,
     slides: r.slides ?? undefined,
     boops: r.boop_count - (myBoops.has(r.id) ? 1 : 0),
     biscuits: r.biscuit_count,
@@ -248,6 +252,13 @@ export async function loadSnapshot(): Promise<Snapshot> {
     createdAt: Date.parse(r.created_at),
   }));
   for (const p of pets) if (myFollows.has(p.id)) p.followers -= 1;
+
+  // Re-check my photo posts that got stuck waiting (e.g. the check was interrupted).
+  if (myPetId) {
+    for (const p of posts) {
+      if (p.petId === myPetId && p.status === "pending" && Date.now() - p.createdAt > 20_000) void moderatePost(p.id);
+    }
+  }
 
   const weekAgo = Date.now() - 7 * 86_400_000;
   const myClanFloofs = myPetId ? posts.filter((p) => p.petId === myPetId && p.createdAt > weekAgo).length : 0;
@@ -288,7 +299,24 @@ const check = (r: { error: { message: string; code?: string } | null }) => {
   if (r.error) throw new Error(r.error.code === "23505" ? "That username is already taken" : r.error.message);
 };
 
+/** Ask the server to check a post's photos for pets. */
+export async function moderatePost(postId: string): Promise<{ status: string; message?: string }> {
+  try {
+    const res = await fetch("/api/moderate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ postId }),
+    });
+    return (await res.json()) as { status: string; message?: string };
+  } catch {
+    return { status: "pending" };
+  }
+}
+
 export const remote = {
+  async deletePost(id: string) {
+    check(await sb().from("posts").delete().eq("id", id));
+  },
   async createPet(pet: Pet) {
     const db = sb();
     const { data: auth } = await db.auth.getSession();

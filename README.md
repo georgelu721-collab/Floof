@@ -37,6 +37,19 @@ Never put the `sb_secret_…` key in the app or in GitHub: it bypasses all secur
 
 To run the old browser-only demo with no backend, set `NEXT_PUBLIC_FLOOF_LOCAL=1`.
 
+### Pet-only photo check
+
+New posts with photos are checked by Claude (`app/api/moderate/route.ts`) before anyone else can see them: every photo must show a pet or other animal (people are fine alongside a pet). Until approved, a post is visible only to its owner; rejected posts show the reason and can be deleted. Drawn posts skip the check. The database enforces this, so it can't be bypassed from the browser.
+
+Add these in **Vercel → Settings → Environment Variables** (server-only, never sent to the browser), then redeploy:
+
+| Variable | Where to get it |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → secret key (`sb_secret_…`) |
+
+Without them, photo posts stay "checking" (visible only to their owner) and are checked automatically once the keys are added.
+
 ### How the data is protected
 
 Every table has row level security: anyone can read public things (pets, posts, boops, comments), but you can only create or change rows for **your own pet**. Saves, messages and the biscuit ledger are private. Biscuits can only move through database functions (`send_biscuits`, `topup_biscuits`, `redeem_biscuits`) that check ownership and balance, so a wallet can't be faked or overspent.

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AFFINITY, DEMO_PET_ID, PETS, POSTS } from "./data";
 import { CLOUD, sb } from "./supabase";
-import { loadSnapshot, remote, subscribeToMessages, type Snapshot } from "./cloud";
+import { loadSnapshot, moderatePost, remote, subscribeToMessages, type Snapshot } from "./cloud";
 import type { Clan, Comment, LedgerEntry, MomentType, Pet, Post, Thread } from "./types";
 
 type State = {
@@ -28,6 +28,7 @@ type State = {
   meetupsOptIn: boolean;
   threads: Record<string, Thread["messages"]>;
   unlocked: Partial<Record<MomentType, string>>; // moment -> postId
+  deleted: Record<string, true>;
 };
 
 const initial: State = {
@@ -52,6 +53,7 @@ const initial: State = {
   meetupsOptIn: false,
   threads: {},
   unlocked: {},
+  deleted: {},
 };
 
 export type Action =
@@ -64,6 +66,7 @@ export type Action =
   | { t: "follow"; petId: string }
   | { t: "comment"; postId: string; petId: string; text: string }
   | { t: "post"; post: Post }
+  | { t: "deletePost"; postId: string }
   | { t: "sendBiscuits"; petId: string; amount: number; note?: string; postId?: string }
   | { t: "topup"; amount: number; note: string }
   | { t: "redeem"; amount: number; note: string }
@@ -123,6 +126,8 @@ function reducer(s: State, a: Action): State {
       const unlocked = a.post.moment && !s.unlocked[a.post.moment] ? { ...s.unlocked, [a.post.moment]: a.post.id } : s.unlocked;
       return { ...s, myPosts: [a.post, ...s.myPosts], unlocked, clanFloofs: s.clan ? s.clanFloofs + 1 : s.clanFloofs };
     }
+    case "deletePost":
+      return { ...s, myPosts: s.myPosts.filter((p) => p.id !== a.postId), deleted: { ...s.deleted, [a.postId]: true } };
     case "sendBiscuits":
       if (a.amount > s.balance || a.amount <= 0) return s;
       return {
@@ -198,6 +203,8 @@ async function syncAction(a: Action, before: State, me: string) {
       return remote.comment(a.postId, me, a.text);
     case "post":
       return remote.post(a.post);
+    case "deletePost":
+      return remote.deletePost(a.postId);
     case "sendBiscuits":
       return remote.sendBiscuits(me, a.petId, a.amount, a.note, a.postId);
     case "topup":
@@ -398,11 +405,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (a.t === "sendBiscuits" && a.amount > stateRef.current.balance) return false;
+      const hasPhotos = a.t === "post" && !!(a.post.image || a.post.images?.length);
+      if (a.t === "post" && hasPhotos) a = { ...a, post: { ...a.post, status: "pending" } };
       const before = stateRef.current;
       rawDispatch(a);
       if (LOGIN_FREE.has(a.t) || a.t === "clanFloof") return true;
       try {
         await syncAction(a, before, me!);
+        if (a.t === "post" && hasPhotos) {
+          // Check the photos for a pet, then refresh so the post shows its result.
+          void moderatePost(a.post.id).then((r) => {
+            if (r.status === "approved") toast("✅ Pet spotted! Your floof is live");
+            else if (r.status === "rejected") toast(`🚫 ${r.message || "We couldn't spot a pet in this photo"}`);
+            void reload();
+          });
+        }
         return true;
       } catch (e) {
         toast(`Didn't save: ${(e as Error).message}`);
@@ -426,7 +443,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const me: Pet = { ...meBase, biscuitsReceived: meBase.biscuitsReceived + s.received, clan: s.clan ?? meBase.clan };
 
     const allPosts = CLOUD ? [...s.myPosts.filter((p) => !snap?.posts.some((x) => x.id === p.id)), ...(snap?.posts ?? [])] : [...s.myPosts, ...POSTS];
-    const posts = allPosts.map((p) => {
+    const posts = allPosts.filter((p) => !s.deleted[p.id]).map((p) => {
       const extra = s.comments[p.id] ?? [];
       return extra.length ? { ...p, comments: [...p.comments, ...extra], commentCount: p.commentCount + extra.length } : p;
     });

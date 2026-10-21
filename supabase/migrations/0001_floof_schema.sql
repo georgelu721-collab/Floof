@@ -56,6 +56,13 @@ alter table public.posts add column if not exists image_urls text[] not null def
 alter table public.posts drop constraint if exists posts_image_urls_max;
 alter table public.posts add constraint posts_image_urls_max check (cardinality(image_urls) <= 6);
 
+-- Added later: photo check. New photo posts start 'pending' and only appear to others once
+-- the server (app/api/moderate) marks them 'approved'. Drawn posts are approved straight away.
+alter table public.posts add column if not exists status text not null default 'approved';
+alter table public.posts drop constraint if exists posts_status_check;
+alter table public.posts add constraint posts_status_check check (status in ('pending', 'approved', 'rejected'));
+alter table public.posts add column if not exists moderation_note text;
+
 create index if not exists posts_created_idx on public.posts (created_at desc);
 create index if not exists posts_pet_idx on public.posts (pet_id);
 
@@ -312,7 +319,7 @@ from public.posts x;
 create or replace view public.clan_totals with (security_invoker = true) as
 select p.clan, (count(*) * 5)::int as points
 from public.posts x join public.pets p on p.id = x.pet_id
-where p.clan is not null and p.owner_id is not null and x.created_at > now() - interval '7 days'
+where p.clan is not null and p.owner_id is not null and x.status = 'approved' and x.created_at > now() - interval '7 days'
 group by p.clan;
 
 create or replace view public.competition_vote_counts with (security_invoker = true) as
@@ -389,8 +396,21 @@ as $$
 begin
   if auth.uid() is not null then
     new.boops_base := 0; new.biscuits_base := 0; new.comments_base := 0;
-    if tg_op = 'INSERT' then new.created_at := now(); end if;
-    if tg_op = 'UPDATE' then new.created_at := old.created_at; new.pet_id := old.pet_id; end if;
+    if tg_op = 'INSERT' then
+      new.created_at := now();
+      new.status := case when new.image_url is not null or cardinality(new.image_urls) > 0 then 'pending' else 'approved' end;
+      new.moderation_note := null;
+    end if;
+    if tg_op = 'UPDATE' then
+      new.created_at := old.created_at; new.pet_id := old.pet_id;
+      -- Owners can't approve their own posts; changing the photos sends it back for checking.
+      if new.image_url is distinct from old.image_url or new.image_urls is distinct from old.image_urls then
+        new.status := case when new.image_url is not null or cardinality(new.image_urls) > 0 then 'pending' else 'approved' end;
+        new.moderation_note := null;
+      else
+        new.status := old.status; new.moderation_note := old.moderation_note;
+      end if;
+    end if;
   end if;
   return new;
 end;
@@ -402,7 +422,7 @@ drop policy if exists floof_posts_read on public.posts;
 drop policy if exists floof_posts_insert on public.posts;
 drop policy if exists floof_posts_update on public.posts;
 drop policy if exists floof_posts_delete on public.posts;
-create policy floof_posts_read on public.posts for select using (true);
+create policy floof_posts_read on public.posts for select using (status = 'approved' or public.owns_pet(pet_id));
 create policy floof_posts_insert on public.posts for insert to authenticated with check (public.owns_pet(pet_id));
 create policy floof_posts_update on public.posts for update to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
 create policy floof_posts_delete on public.posts for delete to authenticated using (public.owns_pet(pet_id));
