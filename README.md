@@ -16,10 +16,36 @@
 
 ## Tech
 
-- [Next.js](https://nextjs.org) (App Router) + React + TypeScript
-- Tailwind CSS v4
-- Pets are drawn as SVG illustrations in the logo's style, so the app needs no external image hosting. You can also upload real photos.
-- There's no backend yet. App state (your pet, posts, biscuits, follows, clan) is saved in the browser's `localStorage`, so the demo works right after deploying.
+- [Next.js](https://nextjs.org) (App Router) + React + TypeScript, Tailwind CSS v4
+- [Supabase](https://supabase.com) backend: Postgres database, email logins, photo storage and live messages
+- Pets are drawn as SVG illustrations in the logo's style; real photos can be uploaded too
+
+## Backend setup (one time)
+
+1. **Create the database.** In Supabase, open **SQL Editor → New query**, paste all of [`supabase/setup.sql`](supabase/setup.sql) and click **Run**. This creates the tables, security rules, biscuit functions, photo bucket and starter content. It's safe to run again.
+2. **Set the login redirect URL.** In **Authentication → URL Configuration**, set **Site URL** to your Vercel address (e.g. `https://floof.vercel.app`) and add `https://*.vercel.app/**` and `http://localhost:3000/**` under **Redirect URLs**. Without this, the email confirmation links point to `localhost`.
+3. *(Optional, for testing)* In **Authentication → Sign In / Providers → Email**, turn off **Confirm email** so new accounts work immediately. Supabase's built-in email sender only allows a few emails per hour; add your own SMTP under **Authentication → Emails** before launch.
+
+The app's Supabase URL and **publishable** key are set in `lib/supabase.ts` (they are public by design). To use a different project, set these in Vercel → Settings → Environment Variables:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://<project>.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` |
+
+Never put the `sb_secret_…` key in the app or in GitHub: it bypasses all security rules. The app doesn't need it.
+
+To run the old browser-only demo with no backend, set `NEXT_PUBLIC_FLOOF_LOCAL=1`.
+
+### How the data is protected
+
+Every table has row level security: anyone can read public things (pets, posts, boops, comments), but you can only create or change rows for **your own pet**. Saves, messages and the biscuit ledger are private. Biscuits can only move through database functions (`send_biscuits`, `topup_biscuits`, `redeem_biscuits`) that check ownership and balance, so a wallet can't be faked or overspent.
+
+Top-ups are **demo only**: `topup_biscuits` adds biscuits without payment. Replace it with a Stripe webhook before biscuits are worth real money.
+
+### Changing starter content
+
+House pets and sample posts live in `lib/data.ts`. After editing, run `npm run db:seed` to regenerate `supabase/seed.sql` and `supabase/setup.sql`, then run the new seed in the SQL Editor.
 
 ## Run locally
 
@@ -38,7 +64,7 @@ No environment variables are needed.
 
 ## Next steps for production
 
-- Add a real backend and auth (e.g. Postgres + Auth.js / Clerk) instead of `localStorage`
-- Image uploads to object storage (e.g. Vercel Blob)
-- Payments for biscuit top-ups and payouts through the Lyca Marketplace partner API
-- Moderation and safety review for meetups
+- Payments for biscuit top-ups (Stripe) and payouts through the Lyca Marketplace partner API
+- Google / Apple sign-in (Supabase → Authentication → Providers)
+- Moderation tools (report a post, block a pet) and a safety review for meetups
+- Events, competitions and packs are defined in `lib/data.ts`; move them into tables when you want to manage them without code changes

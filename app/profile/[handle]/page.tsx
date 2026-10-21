@@ -71,8 +71,7 @@ export default function Profile() {
               aria-label="Settings / log out"
               onClick={() => {
                 if (confirm("Log out of Floof?")) {
-                  dispatch({ t: "logout" });
-                  router.push("/");
+                  void dispatch({ t: "logout" }).then(() => router.push("/"));
                 }
               }}
             >
@@ -86,7 +85,7 @@ export default function Profile() {
         <div className="flex items-center gap-5">
           <PetAvatar pet={pet} size={92} ring="story" />
           <div className="grid flex-1 grid-cols-3 text-center">
-            <Stat n={(pet.owner === "You" ? 0 : 100 + (pet.pawScore % 200)) + theirPosts.length} label="Floofs" />
+            <Stat n={pet.postCount ?? (pet.owner === "You" ? 0 : 100 + (pet.pawScore % 200)) + theirPosts.length} label="Floofs" />
             <Stat n={followers} label="Followers" />
             <Stat n={pet.following + (isMe ? Object.keys(s.following).length : 0)} label="Following" />
           </div>

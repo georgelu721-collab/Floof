@@ -13,7 +13,7 @@ import { ClanWarMini } from "@/components/ClanWar";
 const TABS = ["For you", "Following", "Moments"] as const;
 
 export default function Home() {
-  const { posts, pets, me, s } = useStore();
+  const { posts, pets, me, s, loadError, reload, ready, signedIn, cloud } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]>("For you");
 
   const storyPets = pets.filter((p) => p.id !== me.id).slice(0, 9);
@@ -69,7 +69,28 @@ export default function Home() {
         ))}
       </div>
 
-      {feed.length === 0 && (
+      {loadError && (
+        <div className="card mx-4 my-4 p-5 text-center">
+          <p className="text-3xl">🙀</p>
+          <p className="mt-1 font-display text-lg font-semibold">Can&apos;t reach Floof right now</p>
+          <p className="text-sm text-muted">Check your connection and try again.</p>
+          <button className="btn btn-dark mt-3" onClick={() => void reload()}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {cloud && ready && !signedIn && !loadError && (
+        <Link href="/login?mode=signup" className="card mx-4 my-3 flex items-center gap-3 bg-gradient-to-r from-[#FFE6CC] to-[#FDE4E8] p-4">
+          <span className="text-3xl">🐾</span>
+          <span className="flex-1">
+            <span className="block font-extrabold">Join Floof</span>
+            <span className="block text-xs font-semibold text-cocoa-soft">Create your pet&apos;s account to boop, post and send biscuits</span>
+          </span>
+        </Link>
+      )}
+
+      {!loadError && ready && feed.length === 0 && (
         <p className="px-8 py-16 text-center font-semibold text-muted">Nothing here yet — follow some floofs from Explore! 🐾</p>
       )}
 

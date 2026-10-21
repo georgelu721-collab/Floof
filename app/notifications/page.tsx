@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadNotifications } from "@/lib/cloud";
+import type { Notification } from "@/lib/types";
 import { NOTIFICATIONS } from "@/lib/data";
 import { useStore } from "@/lib/store";
 import { PetAvatar, PostMedia } from "@/components/PetArt";
@@ -16,9 +18,15 @@ const FILTERS = [
 ] as const;
 
 export default function Notifications() {
-  const { pet, post, s, dispatch, me } = useStore();
+  const { pet, post, s, dispatch, me, cloud, signedIn } = useStore();
   const [f, setF] = useState<(typeof FILTERS)[number]["id"]>("all");
-  const list = NOTIFICATIONS.filter((n) => f === "all" || n.kind === f);
+  const [live, setLive] = useState<Notification[] | null>(null);
+  useEffect(() => {
+    if (!cloud || !signedIn) return;
+    loadNotifications(me.id).then(setLive, () => setLive([]));
+  }, [cloud, signedIn, me.id]);
+  const source = cloud ? (live ?? []) : NOTIFICATIONS;
+  const list = source.filter((n) => f === "all" || n.kind === f);
 
   return (
     <Page>
@@ -68,6 +76,10 @@ export default function Notifications() {
           );
         })}
       </ul>
+      {cloud && !signedIn && <p className="px-8 py-16 text-center font-semibold text-muted">Log in to see your notifications 🔔</p>}
+      {cloud && signedIn && live && list.length === 0 && (
+        <p className="px-8 py-16 text-center font-semibold text-muted">No notifications yet. Post a floof and make some friends! 🐾</p>
+      )}
     </Page>
   );
 }

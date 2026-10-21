@@ -10,7 +10,7 @@ import { PetAvatar } from "./PetArt";
 
 const AMOUNTS = [1, 5, 10];
 
-export function BiscuitSheet({ pet, onClose, onSent }: { pet: Pet; onClose: () => void; onSent?: (n: number) => void }) {
+export function BiscuitSheet({ pet, postId, onClose, onSent }: { pet: Pet; postId?: string; onClose: () => void; onSent?: (n: number) => void }) {
   const { s, dispatch, toast, me } = useStore();
   const [amount, setAmount] = useState(1);
   const [note, setNote] = useState("");
@@ -18,9 +18,13 @@ export function BiscuitSheet({ pet, onClose, onSent }: { pet: Pet; onClose: () =
   const isMe = pet.id === me.id;
   const tooMuch = amount > s.balance;
 
-  const send = () => {
-    if (tooMuch || isMe) return;
-    dispatch({ t: "sendBiscuits", petId: pet.id, amount, note: note.trim() || undefined });
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    if (tooMuch || isMe || busy) return;
+    setBusy(true);
+    const ok = await dispatch({ t: "sendBiscuits", petId: pet.id, amount, note: note.trim() || undefined, postId });
+    setBusy(false);
+    if (!ok) return;
     setSent(amount);
     onSent?.(amount);
     toast(`Sent ${amount} biscuit${amount > 1 ? "s" : ""} to ${pet.name} 🍪`);
@@ -98,7 +102,7 @@ export function BiscuitSheet({ pet, onClose, onSent }: { pet: Pet; onClose: () =
                 Top up biscuits
               </Link>
             ) : (
-              <button className="btn btn-dark mt-4 w-full text-lg" onClick={send}>
+              <button className="btn btn-dark mt-4 w-full text-lg" onClick={send} disabled={busy}>
                 Send {amount} Biscuit{amount > 1 ? "s" : ""}
               </button>
             )}

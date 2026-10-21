@@ -91,7 +91,7 @@ export default function Wallet() {
               )}
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="truncate text-sm font-extrabold">
-                  {l.type === "sent" ? `Sent to ${p?.name ?? "a floof"}` : l.type === "redeem" ? "Redeemed" : "Top-up"}
+                  {l.type === "sent" ? `Sent to ${p?.name ?? "a floof"}` : l.type === "received" ? `From ${p?.name ?? "a fan"}` : l.type === "redeem" ? "Redeemed" : "Top-up"}
                 </p>
                 <p className="truncate text-xs font-semibold text-muted">
                   {l.note ?? ""} {l.at ? `· ${timeAgo(l.at)}` : ""}

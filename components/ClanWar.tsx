@@ -22,16 +22,15 @@ export function useCountdown() {
 }
 
 export function useClanScores() {
-  const { s } = useStore();
-  // Tiny live drift so the war feels alive, plus the user's own contribution.
+  const { clanExtra } = useStore();
+  // Tiny live drift so the war feels alive, plus real floofs posted this week.
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 2500);
     return () => clearInterval(t);
   }, []);
-  const mine = s.clanFloofs * 5;
-  const cats = CLAN_WAR.cats + tick * 7 + (s.clan === "cats" ? mine : 0);
-  const dogs = CLAN_WAR.dogs + tick * 6 + (s.clan === "dogs" ? mine : 0);
+  const cats = CLAN_WAR.cats + tick * 7 + clanExtra.cats;
+  const dogs = CLAN_WAR.dogs + tick * 6 + clanExtra.dogs;
   return { cats, dogs, catPct: (cats / (cats + dogs)) * 100 };
 }
 

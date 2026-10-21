@@ -12,13 +12,13 @@ import { BiscuitIcon, IconSend } from "@/components/Icons";
 
 export default function Thread() {
   const { id } = useParams<{ id: string }>();
-  const { pet, s, dispatch, me } = useStore();
+  const { pet, s, dispatch, me, cloud } = useStore();
   const [text, setText] = useState("");
   const [sheet, setSheet] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
   // `id` is either a seeded thread id or a pet id for a direct message.
-  const seeded = THREADS.find((t) => t.id === id) ?? THREADS.find((t) => t.petIds.length === 1 && t.petIds[0] === id);
+  const seeded = cloud ? undefined : (THREADS.find((t) => t.id === id) ?? THREADS.find((t) => t.petIds.length === 1 && t.petIds[0] === id));
   const petIds = seeded ? seeded.petIds : [id];
   const key = seeded ? seeded.id : `dm-${id}`;
   const other = pet(petIds[0]);
@@ -46,7 +46,7 @@ export default function Thread() {
             <PetAvatar pet={other} size={34} /> {seeded?.title ?? other.name}
           </Link>
         }
-        sub={petIds.length > 1 ? `${petIds.length + 1} floofs` : "Active now"}
+        sub={petIds.length > 1 ? `${petIds.length + 1} floofs` : other.ownerId === null ? "Floof house pet · won’t reply" : "Direct message"}
       />
       <div className="flex-1 space-y-2 px-4 pb-4">
         {messages.map((m) => {

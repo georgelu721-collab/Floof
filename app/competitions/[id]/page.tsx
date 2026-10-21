@@ -11,7 +11,7 @@ import { IconCheck, IconTrophy } from "@/components/Icons";
 
 export default function CompetitionPage() {
   const { id } = useParams<{ id: string }>();
-  const { pet, post, posts, me, s, dispatch, toast } = useStore();
+  const { pet, post, posts, me, s, dispatch, toast, extraVotes, remoteEntries } = useStore();
   const [picking, setPicking] = useState(false);
   const c = COMPETITIONS.find((x) => x.id === id);
   if (!c) return <TopBar title="Competition not found" />;
@@ -22,11 +22,14 @@ export default function CompetitionPage() {
   const entries = [
     ...(myEntry ? [{ postId: myEntry, votes: 1 }] : []),
     ...c.entries.filter((e) => e.postId !== myEntry),
+    ...remoteEntries(c.id)
+      .filter((id) => id !== myEntry && !c.entries.some((e) => e.postId === id))
+      .map((postId) => ({ postId, votes: 0 })),
   ]
-    .map((e) => ({ ...e, votes: e.votes + (myVote === e.postId ? 1 : 0), post: post(e.postId) }))
+    .map((e) => ({ ...e, votes: e.votes + extraVotes(c.id, e.postId) + (myVote === e.postId ? 1 : 0), post: post(e.postId) }))
     .filter((e) => e.post)
     .sort((a, b) => b.votes - a.votes);
-  const myPosts = posts.filter((p) => p.petId === me.id);
+  const myPosts = posts.filter((p) => p.petId === me.id && !p.image?.startsWith("data:"));
 
   return (
     <Page>
@@ -68,10 +71,9 @@ export default function CompetitionPage() {
                 {myPosts.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => {
-                      dispatch({ t: "enter", compId: c.id, postId: p.id });
+                    onClick={async () => {
                       setPicking(false);
-                      toast("Entry submitted! Good luck 🍀");
+                      if (await dispatch({ t: "enter", compId: c.id, postId: p.id })) toast("Entry submitted! Good luck 🍀");
                     }}
                   >
                     <PostMedia post={p} pet={me} className="aspect-square rounded-2xl" />

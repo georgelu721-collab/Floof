@@ -9,7 +9,7 @@ import { Page, TopBar } from "@/components/Shell";
 import { IconSearch } from "@/components/Icons";
 
 export default function Messages() {
-  const { pet, s, pets, me } = useStore();
+  const { pet, s, pets, me, cloud } = useStore();
   const [q, setQ] = useState("");
 
   const dmIds = Object.keys(s.threads).filter((k) => k.startsWith("dm-"));
@@ -18,7 +18,7 @@ export default function Messages() {
       .map((k) => k.slice(3))
       .filter((pid) => !THREADS.some((t) => t.petIds.length === 1 && t.petIds[0] === pid))
       .map((pid) => ({ id: pid, petIds: [pid], title: pet(pid)?.name ?? pid, messages: [] as { text: string; at: string }[] })),
-    ...THREADS,
+    ...(cloud ? [] : THREADS),
   ];
 
   const filtered = threads.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));

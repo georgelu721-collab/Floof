@@ -132,7 +132,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">{when}</p>
       </div>
 
-      {sheet && <BiscuitSheet pet={owner} onClose={() => setSheet(false)} onSent={(n) => setExtraBiscuits((x) => x + n)} />}
+      {sheet && <BiscuitSheet pet={owner} postId={post.id} onClose={() => setSheet(false)} onSent={(n) => setExtraBiscuits((x) => x + n)} />}
     </article>
   );
 }

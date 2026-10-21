@@ -8,7 +8,7 @@ import { IconBack, IconHome, IconSearch, IconTrophy, PawIcon } from "./Icons";
 
 export function BottomNav() {
   const path = usePathname();
-  const { me } = useStore();
+  const { me, signedIn } = useStore();
   const item = (href: string, label: string, icon: React.ReactNode, match: string[]) => {
     const on = match.some((m) => path === m || path.startsWith(m + "/"));
     return (
@@ -32,10 +32,10 @@ export function BottomNav() {
         </Link>
         {item("/compete", "Compete", <IconTrophy />, ["/compete", "/competitions", "/clan-wars", "/meetups"])}
         {item(
-          `/profile/${me.handle}`,
+          signedIn ? `/profile/${me.handle}` : "/login",
           "Profile",
           <PetAvatar pet={me} size={24} ring={path.startsWith(`/profile/${me.handle}`) ? "me" : "none"} />,
-          [`/profile/${me.handle}`, "/moments", "/wallet", "/friends"],
+          [`/profile/${me.handle}`, "/moments", "/wallet", "/friends", "/login"],
         )}
       </div>
     </nav>
@@ -78,7 +78,7 @@ export function Toast() {
   const { toastMsg } = useStore();
   if (!toastMsg) return null;
   return (
-    <div className="animate-toast fixed bottom-28 left-1/2 z-50 w-max max-w-[90vw] -translate-x-1/2 rounded-full bg-cocoa px-5 py-3 text-sm font-bold text-white shadow-lg">
+    <div className="animate-toast fixed bottom-28 left-1/2 z-50 w-max max-w-[90vw] rounded-full bg-cocoa px-5 py-3 text-sm font-bold text-white shadow-lg">
       {toastMsg}
     </div>
   );

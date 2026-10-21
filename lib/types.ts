@@ -50,6 +50,8 @@ export type Pet = {
   following: number;
   biscuitsReceived: number;
   pawScore: number;
+  postCount?: number; // from the database (cloud mode)
+  ownerId?: string | null; // null = Floof house pet
   clan: Clan;
   verified?: boolean;
   bg: string; // avatar background tint

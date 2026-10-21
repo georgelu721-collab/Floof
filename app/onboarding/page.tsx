@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PetAvatar } from "@/components/PetArt";
 import { TopBar } from "@/components/Shell";
 import { fileToDataUrl } from "@/lib/image";
@@ -36,7 +36,8 @@ const LOOKS: Record<Species, { label: string; look: Look }[]> = {
 const BGS = ["#FDE7EC", "#E7E3F7", "#FFF1C9", "#E2F0DA", "#DDEBF7", "#FFE3CF"];
 
 export default function Onboarding() {
-  const { dispatch, pets, toast } = useStore();
+  const { dispatch, pets, toast, cloud, userId, ready, s } = useStore();
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -48,6 +49,12 @@ export default function Onboarding() {
   const [city, setCity] = useState("Sydney");
   const [photo, setPhoto] = useState<string | undefined>();
   const [clan, setClan] = useState<Clan>("dogs");
+
+  useEffect(() => {
+    if (!ready || !cloud) return;
+    if (s.me) router.replace("/home");
+    else if (!userId) router.replace("/login?mode=signup");
+  }, [ready, cloud, userId, s.me, router]);
 
   const look = LOOKS[species][Math.min(lookIdx, LOOKS[species].length - 1)].look;
   const autoHandle = (name.trim() ? `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, ".")}.${species}` : "").replace(/^\.|\.$/g, "");
@@ -74,9 +81,10 @@ export default function Onboarding() {
     bg: BGS[(name.length + lookIdx) % BGS.length],
   };
 
-  const finish = () => {
+  const finish = async () => {
     const id = `pet_${Date.now().toString(36)}`;
-    dispatch({
+    setSaving(true);
+    const ok = await dispatch({
       t: "createPet",
       pet: {
         ...preview,
@@ -90,7 +98,9 @@ export default function Onboarding() {
         pawScore: 100,
       },
     });
-    dispatch({ t: "joinClan", clan });
+    setSaving(false);
+    if (!ok) return;
+    if (!cloud) void dispatch({ t: "joinClan", clan });
     toast(`Welcome to Floof, ${name}! 🎉`);
     router.replace("/home");
   };
@@ -208,8 +218,8 @@ export default function Onboarding() {
             <button className="btn btn-soft flex-1" onClick={() => setStep(1)}>
               Back
             </button>
-            <button className="btn btn-pink flex-1" onClick={finish}>
-              Start floofing 🐾
+            <button className="btn btn-pink flex-1" onClick={finish} disabled={saving}>
+              {saving ? "Saving…" : "Start floofing 🐾"}
             </button>
           </div>
           <p className="text-center text-xs text-muted">You get 50 free biscuits to send to new friends.</p>

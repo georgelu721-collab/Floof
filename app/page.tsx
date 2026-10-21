@@ -9,12 +9,13 @@ import { useStore } from "@/lib/store";
 import { PawIcon } from "@/components/Icons";
 
 export default function Welcome() {
-  const { s, ready, dispatch } = useStore();
+  const { s, ready, dispatch, cloud, userId } = useStore();
   const router = useRouter();
 
   useEffect(() => {
     if (ready && s.me) router.replace("/home");
-  }, [ready, s.me, router]);
+    else if (ready && cloud && userId) router.replace("/onboarding");
+  }, [ready, s.me, cloud, userId, router]);
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center overflow-hidden px-8 pb-10 pt-16 text-center">
@@ -41,18 +42,29 @@ export default function Welcome() {
       </p>
 
       <div className="mt-auto w-full space-y-3 pt-10">
-        <Link href="/onboarding" className="btn btn-dark w-full text-lg">
+        <Link href={cloud ? "/login?mode=signup" : "/onboarding"} className="btn btn-dark w-full text-lg">
           Create a pet account
         </Link>
-        <button
-          className="btn btn-soft w-full text-lg"
-          onClick={() => {
-            dispatch({ t: "login", id: DEMO_PET_ID });
-            router.push("/home");
-          }}
-        >
-          Log in as Big Mac (demo)
-        </button>
+        {cloud ? (
+          <>
+            <Link href="/login" className="btn btn-soft w-full text-lg">
+              Log in
+            </Link>
+            <Link href="/home" className="block pt-1 text-sm font-bold text-cocoa-soft">
+              Just looking around →
+            </Link>
+          </>
+        ) : (
+          <button
+            className="btn btn-soft w-full text-lg"
+            onClick={() => {
+              void dispatch({ t: "login", id: DEMO_PET_ID });
+              router.push("/home");
+            }}
+          >
+            Log in as Big Mac (demo)
+          </button>
+        )}
         <p className="pt-2 text-xs text-muted">By continuing you agree to be kind to every floof. 🐾</p>
       </div>
     </main>

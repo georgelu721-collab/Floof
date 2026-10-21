@@ -44,7 +44,7 @@ const EXPRESSIONS: { id: Expression; label: string }[] = [
 function CreateInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { me, dispatch, toast, s } = useStore();
+  const { me, dispatch, toast, s, signedIn, ready } = useStore();
   const initialMoment = params.get("moment") as MomentType | null;
   const validMoment = initialMoment && initialMoment in MOMENT_TYPES ? initialMoment : null;
 
@@ -88,6 +88,19 @@ function CreateInner() {
     toast(moment ? `${MOMENT_TYPES[moment].emoji} ${MOMENT_TYPES[moment].title} unlocked!` : s.clan ? "Floof posted! +5 for your clan 🐾" : "Floof posted! 🐾");
     router.push("/home");
   };
+
+  if (ready && !signedIn) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center px-8 text-center">
+        <p className="text-6xl">🐾</p>
+        <h1 className="mt-4 font-display text-2xl font-semibold">Join Floof to post</h1>
+        <p className="mt-1 text-cocoa-soft">Create a pet account to share floofs and first moments.</p>
+        <a href="/login?mode=signup" className="btn btn-dark mt-6">
+          Create a pet account
+        </a>
+      </main>
+    );
+  }
 
   return (
     <main className="pb-10">
