@@ -879,7 +879,7 @@ declare
   c text;
 begin
   if not public.owns_pet(p_pet) then raise exception 'not your pet'; end if;
-  c := encode(gen_random_bytes(6), 'hex');
+  c := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
   insert into public.pet_invites (code, pet_id, created_by) values (c, p_pet, auth.uid());
   return c;
 end;
