@@ -20,7 +20,7 @@ export function MomentBadge({ type, className = "" }: { type: Post["moment"]; cl
 }
 
 export function PostCard({ post, full = false }: { post: Post; full?: boolean }) {
-  const { pet, s, dispatch, toast } = useStore();
+  const { pet, s, dispatch, toast, me } = useStore();
   const owner = pet(post.petId);
   const [sheet, setSheet] = useState(false);
   const [burst, setBurst] = useState(0);
@@ -126,6 +126,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
       </div>
 
       <div className="space-y-1.5 px-4 pt-2 text-[15px]">
+        {owner.id === me.id && <BiscuitGifts postId={post.id} />}
         {post.moment && <MomentBadge type={post.moment} />}
         <p>
           <Link href={`/profile/${owner.handle}`} className="font-extrabold">
@@ -165,5 +166,33 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
 
       {sheet && <BiscuitSheet pet={owner} postId={post.id} onClose={() => setSheet(false)} onSent={(n) => setExtraBiscuits((x) => x + n)} />}
     </article>
+  );
+}
+
+/** For the post's owner: who sent biscuits on this post (gift details are private to the owner). */
+function BiscuitGifts({ postId }: { postId: string }) {
+  const { s, pet } = useStore();
+  const gifts = s.ledger.filter((l) => l.type === "received" && l.postId === postId && l.petId);
+  if (!gifts.length) return null;
+  const bySender = new Map<string, number>();
+  for (const g of gifts) bySender.set(g.petId!, (bySender.get(g.petId!) ?? 0) + g.amount);
+  const senders = [...bySender.entries()].sort((a, b) => b[1] - a[1]);
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 rounded-2xl bg-[#FFF1E0] px-3 py-2 text-sm">
+      <BiscuitIcon size={18} />
+      {senders.slice(0, 3).map(([id, n], i) => {
+        const p = pet(id);
+        return (
+          <span key={id}>
+            <Link href={`/profile/${p?.handle ?? ""}`} className="font-extrabold">
+              {p?.handle ?? "a fan"}
+            </Link>{" "}
+            sent {n}
+            {i < Math.min(senders.length, 3) - 1 ? "," : ""}
+          </span>
+        );
+      })}
+      {senders.length > 3 && <span className="font-semibold text-muted">+{senders.length - 3} more</span>}
+    </p>
   );
 }

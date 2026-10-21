@@ -166,6 +166,7 @@ export type LedgerEntry = {
   type: "sent" | "topup" | "received" | "redeem";
   amount: number; // biscuits
   petId?: string;
+  postId?: string; // the post a gift was sent on
   note?: string;
   at: number;
 };

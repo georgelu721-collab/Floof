@@ -328,11 +328,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { data } = sb().auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT") void reload();
     });
-    const onFocus = () => void reload();
-    window.addEventListener("focus", onFocus);
+    let last = Date.now();
+    const refresh = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 5000) return;
+      last = Date.now();
+      void reload();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, 60_000);
     return () => {
       data.subscription.unsubscribe();
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearInterval(timer);
     };
   }, [reload]);
 

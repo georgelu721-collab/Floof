@@ -92,7 +92,10 @@ export function BiscuitSheet({ pet, postId, onClose, onSent }: { pet: Pet; postI
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
-            <p className="mt-4 text-sm text-muted">
+            <p className="mt-3 text-xs font-semibold text-muted">
+              {postId ? `This gift counts toward ${pet.name}'s post.` : `This gift goes to ${pet.name}'s wallet, not a specific post.`}
+            </p>
+            <p className="mt-2 text-sm text-muted">
               Your balance: <b className="text-cocoa">{s.balance} biscuits</b> ({formatAUD(s.balance)})
             </p>
             {isMe ? (
