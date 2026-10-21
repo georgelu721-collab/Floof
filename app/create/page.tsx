@@ -98,7 +98,7 @@ function CreateInner() {
     });
     toast(
       cloud && photos.length
-        ? "Posted! Checking your photo for a pet 🔍"
+        ? "Posted! Publishing your photo… 🐾"
         : dailyDate
           ? "🔥 Daily Floof answered! See you tomorrow"
           : moment

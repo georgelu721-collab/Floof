@@ -415,14 +415,14 @@ const check = (r: { error: { message: string; code?: string } | null }) => {
 };
 
 /** Ask the server to check a post's photos for pets. */
-export async function moderatePost(postId: string): Promise<{ status: string; message?: string }> {
+export async function moderatePost(postId: string): Promise<{ status: string; message?: string; filter?: "on" | "off" }> {
   try {
     const res = await fetch("/api/moderate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ postId }),
     });
-    return (await res.json()) as { status: string; message?: string };
+    return (await res.json()) as { status: string; message?: string; filter?: "on" | "off" };
   } catch {
     return { status: "pending" };
   }

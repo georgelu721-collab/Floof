@@ -574,7 +574,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (a.t === "post" && hasPhotos) {
           // Check the photos for a pet, then refresh so the post shows its result.
           void moderatePost(a.post.id).then((r) => {
-            if (r.status === "approved") toast("✅ Pet spotted! Your floof is live");
+            if (r.status === "approved") toast(r.filter === "off" ? "✅ Your floof is live" : "✅ Pet spotted! Your floof is live");
             else if (r.status === "rejected") toast(`🚫 ${r.message || "We couldn't spot a pet in this photo"}`);
             void reload();
           });

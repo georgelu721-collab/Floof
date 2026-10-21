@@ -1,7 +1,7 @@
 // Checks a newly posted floof: every photo must show a pet. Runs on the server only.
 //
 // Needs two environment variables in Vercel (Settings → Environment Variables):
-//   ANTHROPIC_API_KEY    – from console.anthropic.com
+//   ANTHROPIC_API_KEY    – from console.anthropic.com (optional: without it, photo posts are published unchecked)
 //   SUPABASE_SECRET_KEY  – Supabase → Project Settings → API Keys → secret key (sb_secret_…)
 // Neither is ever sent to the browser.
 
@@ -37,7 +37,7 @@ Set "allowed" to true only if every photo shows a pet or animal. Keep "reason" t
 export async function POST(req: Request) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const secret = process.env.SUPABASE_SECRET_KEY;
-  if (!anthropicKey || !secret) {
+  if (!secret) {
     return Response.json({ status: "unconfigured", message: "Photo checking is not set up yet." }, { status: 503 });
   }
 
@@ -57,9 +57,10 @@ export async function POST(req: Request) {
     .slice(0, 6)
     .map((u: string) => (u.startsWith("/") ? origin + u : u));
 
-  if (photos.length === 0) {
+  // No photos to check, or the AI filter isn't switched on yet (no ANTHROPIC_API_KEY): publish straight away.
+  if (photos.length === 0 || !anthropicKey) {
     await db.from("posts").update({ status: "approved", moderation_note: null }).eq("id", postId);
-    return Response.json({ status: "approved" });
+    return Response.json({ status: "approved", filter: anthropicKey ? "on" : "off" });
   }
 
   const client = new Anthropic({ apiKey: anthropicKey });

@@ -48,7 +48,7 @@ Add these in **Vercel → Settings → Environment Variables** (server-only, nev
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → secret key (`sb_secret_…`) |
 
-Without them, photo posts stay "checking" (visible only to their owner) and are checked automatically once the keys are added.
+`ANTHROPIC_API_KEY` is optional: without it, photo posts are published straight away (no pet check). `SUPABASE_SECRET_KEY` is required for photo posts to be published.
 
 ### Daily habits & notifications
 
