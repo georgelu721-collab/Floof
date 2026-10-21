@@ -7,6 +7,10 @@ import { useStore } from "@/lib/store";
 import type { Post } from "@/lib/types";
 import { BiscuitSheet } from "./BiscuitSheet";
 import { ShareSheet } from "./ShareSheet";
+import { SaveSheet } from "./SaveSheet";
+import { Sheet } from "./Sheet";
+import { TaggedLine } from "./TagPicker";
+import { useRouter } from "next/navigation";
 import { BiscuitIcon, IconBookmark, IconComment, IconHeart, IconMore, IconSend, PawIcon } from "./Icons";
 import { PetAvatar, PostMedia } from "./PetArt";
 
@@ -25,6 +29,9 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
   const owner = pet(post.petId);
   const [sheet, setSheet] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [saveSheet, setSaveSheet] = useState(false);
+  const router = useRouter();
   const [burst, setBurst] = useState(0);
   const [extraBiscuits, setExtraBiscuits] = useState(0);
   const lastTap = useRef(0);
@@ -56,9 +63,15 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
             {owner.handle}
             {owner.verified && <span className="ml-1 text-sky">●</span>}
           </Link>
-          {post.location && <p className="truncate text-xs font-semibold text-muted">{post.location}</p>}
+          {(post.location || post.taggedPets?.length) && (
+            <p className="truncate text-xs font-semibold text-muted">
+              {post.location}
+              {post.location && post.taggedPets?.length ? " · " : ""}
+              <TaggedLine ids={post.taggedPets} />
+            </p>
+          )}
         </div>
-        <button className="rounded-full p-1.5 text-muted hover:bg-sand" aria-label="More">
+        <button className="rounded-full p-1.5 text-muted hover:bg-sand" aria-label="More" onClick={() => setMenu(true)}>
           <IconMore />
         </button>
       </header>
@@ -109,7 +122,15 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
         <button onClick={() => setShareOpen(true)} aria-label="Share">
           <IconSend />
         </button>
-        <button className="ml-auto" onClick={() => dispatch({ t: "save", postId: post.id })} aria-pressed={saved} aria-label="Save">
+        <button
+          className="ml-auto"
+          onClick={async () => {
+            if (saved) return void dispatch({ t: "save", postId: post.id });
+            if (await dispatch({ t: "save", postId: post.id })) setSaveSheet(true);
+          }}
+          aria-pressed={saved}
+          aria-label="Save"
+        >
           <IconBookmark className={saved ? "fill-cocoa" : ""} />
         </button>
       </div>
@@ -138,7 +159,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
           </Link>
         )}
         {!full &&
-          post.comments.slice(-2).map((c) => {
+          post.comments.filter((c) => !c.parentId).slice(-2).map((c) => {
             const by = pet(c.petId);
             if (!by) return null;
             return (
@@ -150,10 +171,61 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
               </p>
             );
           })}
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{when}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+          {when}
+          {post.editedAt ? " · edited" : ""}
+        </p>
       </div>
 
       {shareOpen && <ShareSheet post={post} onClose={() => setShareOpen(false)} />}
+      {saveSheet && <SaveSheet post={post} onClose={() => setSaveSheet(false)} />}
+      {menu && (
+        <Sheet title="Floof" onClose={() => setMenu(false)}>
+          <div className="space-y-2">
+            {owner.id === me.id && (
+              <>
+                <button className="btn btn-soft w-full" onClick={() => router.push(`/post/${post.id}/edit`)}>
+                  ✏️ Edit caption & tags
+                </button>
+                <button
+                  className="btn btn-soft w-full !text-blush"
+                  onClick={async () => {
+                    if (!confirm("Delete this floof? This can't be undone.")) return;
+                    setMenu(false);
+                    if (await dispatch({ t: "deletePost", postId: post.id })) toast("Floof deleted");
+                  }}
+                >
+                  🗑️ Delete
+                </button>
+              </>
+            )}
+            <button
+              className="btn btn-soft w-full"
+              onClick={() => {
+                setMenu(false);
+                setSaveSheet(true);
+                if (!saved) void dispatch({ t: "save", postId: post.id });
+              }}
+            >
+              🔖 Save to collection
+            </button>
+            <button
+              className="btn btn-soft w-full"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
+                  toast("Link copied 🔗");
+                } catch {
+                  toast(`${window.location.origin}/post/${post.id}`);
+                }
+                setMenu(false);
+              }}
+            >
+              🔗 Copy link
+            </button>
+          </div>
+        </Sheet>
+      )}
       {sheet && <BiscuitSheet pet={owner} postId={post.id} onClose={() => setSheet(false)} onSent={(n) => setExtraBiscuits((x) => x + n)} />}
     </article>
   );

@@ -35,6 +35,16 @@ create index if not exists pets_owner_idx on public.pets (owner_id);
 -- Added later: dates for birthday / Gotcha Day reminders.
 alter table public.pets add column if not exists birthday date;
 alter table public.pets add column if not exists gotcha_day date;
+-- Added later: personality quiz result.
+alter table public.pets add column if not exists personality text check (char_length(personality) <= 40);
+
+-- Added later: family sharing. Other people who help manage a pet (owner stays in pets.owner_id).
+create table if not exists public.pet_members (
+  pet_id text not null references public.pets (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (pet_id, user_id)
+);
 
 create table if not exists public.posts (
   id text primary key default gen_random_uuid()::text,
@@ -65,6 +75,15 @@ alter table public.posts add column if not exists status text not null default '
 alter table public.posts drop constraint if exists posts_status_check;
 alter table public.posts add constraint posts_status_check check (status in ('pending', 'approved', 'rejected'));
 alter table public.posts add column if not exists moderation_note text;
+-- Added later: pet tags, photo frame + stickers, edit time.
+alter table public.posts add column if not exists tagged_pets text[] not null default '{}';
+alter table public.posts add column if not exists frame text;
+alter table public.posts add column if not exists stickers jsonb not null default '[]';
+alter table public.posts add column if not exists edited_at timestamptz;
+alter table public.posts drop constraint if exists posts_tagged_max;
+alter table public.posts add constraint posts_tagged_max check (cardinality(tagged_pets) <= 10);
+create index if not exists posts_tagged_idx on public.posts using gin (tagged_pets);
+
 -- Added later: which day's Daily Floof prompt this post answers.
 alter table public.posts add column if not exists daily_date date;
 create index if not exists posts_daily_idx on public.posts (daily_date) where daily_date is not null;
@@ -81,6 +100,8 @@ create table if not exists public.comments (
   created_at timestamptz not null default now()
 );
 create index if not exists comments_post_idx on public.comments (post_id);
+-- Added later: replies (one level deep).
+alter table public.comments add column if not exists parent_id uuid references public.comments (id) on delete cascade;
 
 create table if not exists public.boops (
   post_id text not null references public.posts (id) on delete cascade,
@@ -126,6 +147,8 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 create index if not exists messages_to_idx on public.messages (to_pet, created_at);
+-- Added later: reply to a specific message.
+alter table public.messages add column if not exists reply_to uuid references public.messages (id) on delete set null;
 create index if not exists messages_from_idx on public.messages (from_pet, created_at);
 
 -- Events, meetups, competitions and packs are defined in the app (lib/data.ts);
@@ -174,7 +197,8 @@ stable
 security definer
 set search_path = public
 as $$
-  select exists (select 1 from public.pets where id = p_pet and owner_id = auth.uid());
+  select exists (select 1 from public.pets where id = p_pet and owner_id = auth.uid())
+      or exists (select 1 from public.pet_members where pet_id = p_pet and user_id = auth.uid());
 $$;
 
 -- Give every new (real) pet 50 welcome biscuits.
@@ -185,7 +209,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.owner_id is not null then
+  -- Only an account's first pet gets the welcome gift (stops farming biscuits with extra pets).
+  if new.owner_id is not null and (select count(*) from public.pets where owner_id = new.owner_id) = 1 then
     insert into public.biscuit_ledger (pet_id, kind, amount, note)
     values (new.id, 'welcome', 50, 'Welcome gift from Floof 🎁');
   end if;
@@ -306,7 +331,7 @@ drop view if exists public.pet_profiles;
 create view public.pet_profiles with (security_invoker = true) as
 select
   p.id, p.owner_id, p.handle, p.name, p.species, p.breed, p.age, p.city, p.bio, p.look,
-  p.photo_url, p.bg, p.clan, p.verified, p.paw_score_base, p.created_at, p.birthday, p.gotcha_day,
+  p.photo_url, p.bg, p.clan, p.verified, p.paw_score_base, p.created_at, p.birthday, p.gotcha_day, p.personality,
   p.followers_base + (select count(*) from public.follows f where f.followee_id = p.id)::int as followers,
   p.following_base + (select count(*) from public.follows f where f.follower_id = p.id)::int as following,
   p.biscuits_base + coalesce((select t.received_net from public.pet_biscuit_totals t where t.pet_id = p.id), 0) as biscuits_received,
@@ -358,7 +383,7 @@ drop policy if exists floof_pets_update on public.pets;
 drop policy if exists floof_pets_delete on public.pets;
 create policy floof_pets_read on public.pets for select using (true);
 create policy floof_pets_insert on public.pets for insert to authenticated with check (owner_id = auth.uid());
-create policy floof_pets_update on public.pets for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy floof_pets_update on public.pets for update to authenticated using (public.owns_pet(id)) with check (public.owns_pet(id));
 create policy floof_pets_delete on public.pets for delete to authenticated using (owner_id = auth.uid());
 
 -- Owners can't edit the "base" numbers (only house pets have them).
@@ -421,6 +446,9 @@ begin
       else
         new.status := old.status; new.moderation_note := old.moderation_note;
       end if;
+      if new.caption is distinct from old.caption or new.tags is distinct from old.tags or new.tagged_pets is distinct from old.tagged_pets then
+        new.edited_at := now();
+      end if;
     end if;
   end if;
   return new;
@@ -442,7 +470,10 @@ drop policy if exists floof_comments_read on public.comments;
 drop policy if exists floof_comments_insert on public.comments;
 drop policy if exists floof_comments_delete on public.comments;
 create policy floof_comments_read on public.comments for select using (true);
-create policy floof_comments_insert on public.comments for insert to authenticated with check (public.owns_pet(pet_id) and likes = 0);
+create policy floof_comments_insert on public.comments for insert to authenticated with check (
+  public.owns_pet(pet_id) and likes = 0
+  and (comments.parent_id is null or exists (select 1 from public.comments c where c.id = comments.parent_id and c.post_id = comments.post_id))
+);
 create policy floof_comments_delete on public.comments for delete to authenticated using (public.owns_pet(pet_id));
 
 -- Simple "my pet did X" tables: everyone can read, you can add/remove your own rows.
@@ -474,7 +505,13 @@ create policy floof_ledger_read on public.biscuit_ledger for select to authentic
 drop policy if exists floof_messages_read on public.messages;
 drop policy if exists floof_messages_write on public.messages;
 create policy floof_messages_read on public.messages for select to authenticated using (public.owns_pet(from_pet) or public.owns_pet(to_pet));
-create policy floof_messages_write on public.messages for insert to authenticated with check (public.owns_pet(from_pet) and from_pet <> to_pet);
+create policy floof_messages_write on public.messages for insert to authenticated with check (
+  public.owns_pet(from_pet) and from_pet <> to_pet
+  and (messages.reply_to is null or exists (
+    select 1 from public.messages m where m.id = messages.reply_to
+      and ((m.from_pet = messages.from_pet and m.to_pet = messages.to_pet) or (m.from_pet = messages.to_pet and m.to_pet = messages.from_pet))
+  ))
+);
 
 drop policy if exists floof_rsvps_read on public.event_rsvps;
 drop policy if exists floof_rsvps_insert on public.event_rsvps;
@@ -690,6 +727,281 @@ end;
 $$;
 drop trigger if exists posts_welcome_first on public.posts;
 create trigger posts_welcome_first after insert on public.posts for each row execute function public.welcome_first_post();
+
+-- ===========================================================================
+-- Social features (added later)
+-- ===========================================================================
+
+-- At most 6 pets per account.
+create or replace function public.limit_pets_per_owner()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.owner_id is not null and (select count(*) from public.pets where owner_id = new.owner_id) >= 6 then
+    raise exception 'You can have up to 6 pets per account';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists pets_limit_per_owner on public.pets;
+create trigger pets_limit_per_owner before insert on public.pets for each row execute function public.limit_pets_per_owner();
+
+-- Comment likes.
+create table if not exists public.comment_likes (
+  comment_id uuid not null references public.comments (id) on delete cascade,
+  pet_id text not null references public.pets (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, pet_id)
+);
+create or replace view public.comment_like_counts with (security_invoker = true) as
+select comment_id, count(*)::int as likes from public.comment_likes group by comment_id;
+
+-- Message reactions (one per pet per message).
+create table if not exists public.message_reactions (
+  message_id uuid not null references public.messages (id) on delete cascade,
+  pet_id text not null references public.pets (id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  primary key (message_id, pet_id)
+);
+
+-- 24-hour stories.
+create table if not exists public.stories (
+  id uuid primary key default gen_random_uuid(),
+  pet_id text not null references public.pets (id) on delete cascade,
+  image_url text,
+  text text check (char_length(text) <= 200),
+  bg text not null default '#F7A07A',
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '24 hours'
+);
+create index if not exists stories_live_idx on public.stories (expires_at desc);
+create table if not exists public.story_views (
+  story_id uuid not null references public.stories (id) on delete cascade,
+  viewer_id text not null references public.pets (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (story_id, viewer_id)
+);
+create or replace function public.story_times()
+returns trigger
+language plpgsql
+as $$
+begin
+  if auth.uid() is not null then
+    new.created_at := now();
+    new.expires_at := now() + interval '24 hours';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists stories_times on public.stories;
+create trigger stories_times before insert on public.stories for each row execute function public.story_times();
+
+-- Saved-post collections (private).
+create table if not exists public.collections (
+  id uuid primary key default gen_random_uuid(),
+  pet_id text not null references public.pets (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 40),
+  created_at timestamptz not null default now()
+);
+create table if not exists public.collection_items (
+  collection_id uuid not null references public.collections (id) on delete cascade,
+  post_id text not null references public.posts (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (collection_id, post_id)
+);
+
+-- Paw-fives: a quick hello, once per pet pair per day.
+create table if not exists public.paw_fives (
+  id uuid primary key default gen_random_uuid(),
+  from_pet text not null references public.pets (id) on delete cascade,
+  to_pet text not null references public.pets (id) on delete cascade,
+  day date not null default current_date,
+  created_at timestamptz not null default now(),
+  unique (from_pet, to_pet, day),
+  check (from_pet <> to_pet)
+);
+
+-- Playdate invites.
+create table if not exists public.playdates (
+  id uuid primary key default gen_random_uuid(),
+  from_pet text not null references public.pets (id) on delete cascade,
+  to_pet text not null references public.pets (id) on delete cascade,
+  place text not null check (char_length(place) between 1 and 100),
+  starts_at timestamptz not null,
+  note text not null default '' check (char_length(note) <= 300),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled')),
+  created_at timestamptz not null default now(),
+  check (from_pet <> to_pet)
+);
+-- Only the invited pet can accept/decline; only the inviter can cancel; nothing else changes.
+create or replace function public.playdate_rules()
+returns trigger
+language plpgsql
+as $$
+declare
+  next_status text := new.status;
+begin
+  if auth.uid() is null then return new; end if;
+  if next_status = old.status then return old; end if;
+  if not (
+    (next_status in ('accepted', 'declined') and old.status = 'pending' and public.owns_pet(old.to_pet))
+    or (next_status = 'cancelled' and old.status in ('pending', 'accepted') and public.owns_pet(old.from_pet))
+  ) then
+    raise exception 'That change is not allowed';
+  end if;
+  new := old;
+  new.status := next_status;
+  return new;
+end;
+$$;
+drop trigger if exists playdates_rules on public.playdates;
+create trigger playdates_rules before update on public.playdates for each row execute function public.playdate_rules();
+
+-- Family invites.
+create table if not exists public.pet_invites (
+  code text primary key,
+  pet_id text not null references public.pets (id) on delete cascade,
+  created_by uuid not null default auth.uid(),
+  expires_at timestamptz not null default now() + interval '7 days',
+  used_by uuid,
+  used_at timestamptz
+);
+
+create or replace function public.create_family_invite(p_pet text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  c text;
+begin
+  if not public.owns_pet(p_pet) then raise exception 'not your pet'; end if;
+  c := encode(gen_random_bytes(6), 'hex');
+  insert into public.pet_invites (code, pet_id, created_by) values (c, p_pet, auth.uid());
+  return c;
+end;
+$$;
+
+create or replace function public.accept_family_invite(p_code text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  inv public.pet_invites;
+begin
+  if auth.uid() is null then raise exception 'Please log in first'; end if;
+  select * into inv from public.pet_invites where code = lower(trim(p_code)) for update;
+  if inv.code is null then raise exception 'That invite code doesn''t exist'; end if;
+  if inv.used_at is not null then raise exception 'That invite has already been used'; end if;
+  if inv.expires_at < now() then raise exception 'That invite has expired'; end if;
+  if public.owns_pet(inv.pet_id) then return inv.pet_id; end if;
+  insert into public.pet_members (pet_id, user_id) values (inv.pet_id, auth.uid()) on conflict do nothing;
+  update public.pet_invites set used_by = auth.uid(), used_at = now() where code = inv.code;
+  return inv.pet_id;
+end;
+$$;
+
+-- Row level security for the social tables.
+alter table public.pet_members enable row level security;
+alter table public.pet_invites enable row level security;
+alter table public.comment_likes enable row level security;
+alter table public.message_reactions enable row level security;
+alter table public.stories enable row level security;
+alter table public.story_views enable row level security;
+alter table public.collections enable row level security;
+alter table public.collection_items enable row level security;
+alter table public.paw_fives enable row level security;
+alter table public.playdates enable row level security;
+
+drop policy if exists floof_members_read on public.pet_members;
+drop policy if exists floof_members_delete on public.pet_members;
+create policy floof_members_read on public.pet_members for select to authenticated using (user_id = auth.uid() or public.owns_pet(pet_id));
+create policy floof_members_delete on public.pet_members for delete to authenticated
+  using (user_id = auth.uid() or exists (select 1 from public.pets p where p.id = pet_id and p.owner_id = auth.uid()));
+
+drop policy if exists floof_invites_read on public.pet_invites;
+drop policy if exists floof_invites_delete on public.pet_invites;
+create policy floof_invites_read on public.pet_invites for select to authenticated using (public.owns_pet(pet_id));
+create policy floof_invites_delete on public.pet_invites for delete to authenticated using (public.owns_pet(pet_id));
+
+drop policy if exists floof_clikes_read on public.comment_likes;
+drop policy if exists floof_clikes_insert on public.comment_likes;
+drop policy if exists floof_clikes_delete on public.comment_likes;
+create policy floof_clikes_read on public.comment_likes for select using (true);
+create policy floof_clikes_insert on public.comment_likes for insert to authenticated with check (public.owns_pet(pet_id));
+create policy floof_clikes_delete on public.comment_likes for delete to authenticated using (public.owns_pet(pet_id));
+
+drop policy if exists floof_reactions_read on public.message_reactions;
+drop policy if exists floof_reactions_insert on public.message_reactions;
+drop policy if exists floof_reactions_update on public.message_reactions;
+drop policy if exists floof_reactions_delete on public.message_reactions;
+create policy floof_reactions_read on public.message_reactions for select to authenticated using (
+  exists (select 1 from public.messages m where m.id = message_id and (public.owns_pet(m.from_pet) or public.owns_pet(m.to_pet)))
+);
+create policy floof_reactions_insert on public.message_reactions for insert to authenticated with check (
+  public.owns_pet(pet_id) and exists (select 1 from public.messages m where m.id = message_id and pet_id in (m.from_pet, m.to_pet))
+);
+create policy floof_reactions_update on public.message_reactions for update to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
+create policy floof_reactions_delete on public.message_reactions for delete to authenticated using (public.owns_pet(pet_id));
+
+drop policy if exists floof_stories_read on public.stories;
+drop policy if exists floof_stories_insert on public.stories;
+drop policy if exists floof_stories_delete on public.stories;
+create policy floof_stories_read on public.stories for select using (expires_at > now() or public.owns_pet(pet_id));
+create policy floof_stories_insert on public.stories for insert to authenticated with check (public.owns_pet(pet_id) and (image_url is not null or coalesce(text, '') <> ''));
+create policy floof_stories_delete on public.stories for delete to authenticated using (public.owns_pet(pet_id));
+
+drop policy if exists floof_views_read on public.story_views;
+drop policy if exists floof_views_insert on public.story_views;
+create policy floof_views_read on public.story_views for select to authenticated using (
+  public.owns_pet(viewer_id) or exists (select 1 from public.stories s where s.id = story_id and public.owns_pet(s.pet_id))
+);
+create policy floof_views_insert on public.story_views for insert to authenticated with check (public.owns_pet(viewer_id));
+
+drop policy if exists floof_collections_all on public.collections;
+create policy floof_collections_all on public.collections for all to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
+drop policy if exists floof_collection_items_all on public.collection_items;
+create policy floof_collection_items_all on public.collection_items for all to authenticated
+  using (exists (select 1 from public.collections c where c.id = collection_id and public.owns_pet(c.pet_id)))
+  with check (exists (select 1 from public.collections c where c.id = collection_id and public.owns_pet(c.pet_id)));
+
+drop policy if exists floof_pawfives_read on public.paw_fives;
+drop policy if exists floof_pawfives_insert on public.paw_fives;
+create policy floof_pawfives_read on public.paw_fives for select to authenticated using (public.owns_pet(from_pet) or public.owns_pet(to_pet));
+create policy floof_pawfives_insert on public.paw_fives for insert to authenticated with check (public.owns_pet(from_pet) and day = current_date);
+
+drop policy if exists floof_playdates_read on public.playdates;
+drop policy if exists floof_playdates_insert on public.playdates;
+drop policy if exists floof_playdates_update on public.playdates;
+create policy floof_playdates_read on public.playdates for select to authenticated using (public.owns_pet(from_pet) or public.owns_pet(to_pet));
+create policy floof_playdates_insert on public.playdates for insert to authenticated with check (public.owns_pet(from_pet) and status = 'pending');
+create policy floof_playdates_update on public.playdates for update to authenticated using (public.owns_pet(from_pet) or public.owns_pet(to_pet)) with check (true);
+
+grant select on public.comment_likes, public.comment_like_counts, public.stories to anon, authenticated;
+grant insert, delete on public.comment_likes, public.stories, public.pet_members, public.pet_invites to authenticated;
+grant select on public.pet_members, public.pet_invites, public.message_reactions, public.story_views, public.paw_fives, public.playdates to authenticated;
+grant insert, update, delete on public.message_reactions to authenticated;
+grant insert on public.story_views, public.paw_fives, public.playdates to authenticated;
+grant update on public.playdates to authenticated;
+grant select, insert, update, delete on public.collections, public.collection_items to authenticated;
+revoke all on function public.create_family_invite(text) from public, anon;
+revoke all on function public.accept_family_invite(text) from public, anon;
+grant execute on function public.create_family_invite(text) to authenticated;
+grant execute on function public.accept_family_invite(text) to authenticated;
+
+-- Live updates for message reactions too.
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'message_reactions') then
+    alter publication supabase_realtime add table public.message_reactions;
+  end if;
+end $$;
 
 -- Make the Data API pick up new columns and tables straight away.
 notify pgrst, 'reload schema';

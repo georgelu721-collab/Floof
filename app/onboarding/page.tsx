@@ -53,7 +53,8 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (!ready || !cloud) return;
-    if (s.me) router.replace("/home");
+    const addingAnother = new URLSearchParams(window.location.search).get("another") === "1";
+    if (s.me && !addingAnother) router.replace("/home");
     else if (!userId) router.replace("/login?mode=signup");
   }, [ready, cloud, userId, s.me, router]);
 

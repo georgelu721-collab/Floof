@@ -15,10 +15,13 @@ const FILTERS = [
   { id: "comment", label: "Comments" },
   { id: "biscuit", label: "Biscuits" },
   { id: "follow", label: "Follows" },
+  { id: "reply", label: "Replies" },
+  { id: "pawfive", label: "Paw-fives" },
+  { id: "playdate", label: "Playdates" },
 ] as const;
 
 export default function Notifications() {
-  const { pet, post, s, dispatch, me, cloud, signedIn, alerts, toast } = useStore();
+  const { pet, post, s, dispatch, me, cloud, signedIn, alerts, toast, pawFivedToday } = useStore();
   const [f, setF] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [thanked, setThanked] = useState<Record<string, true>>({});
   const nearbyAlerts = alerts.filter(
@@ -104,6 +107,23 @@ export default function Notifications() {
                     Say thanks
                   </button>
                 )
+              ) : n.kind === "pawfive" ? (
+                pawFivedToday(p.id) ? (
+                  <span className="rounded-full bg-sand px-3 py-1.5 text-xs font-extrabold text-muted">🐾 Sent</span>
+                ) : (
+                  <button
+                    className="rounded-full bg-[#FFF1E0] px-3 py-1.5 text-xs font-extrabold"
+                    onClick={async () => {
+                      if (await dispatch({ t: "pawFive", petId: p.id })) toast(`Paw-five back to ${p.name}! 🐾`);
+                    }}
+                  >
+                    Paw-five back
+                  </button>
+                )
+              ) : n.kind === "playdate" ? (
+                <Link href="/playdates" className="rounded-full bg-sand px-3 py-1.5 text-xs font-extrabold">
+                  View
+                </Link>
               ) : n.kind === "pack" ? (
                 <Link href="/meetups" className="rounded-full bg-sand px-3 py-1.5 text-xs font-extrabold">
                   View

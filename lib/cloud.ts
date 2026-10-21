@@ -3,7 +3,7 @@
 import { sb } from "./supabase";
 import { timeAgo } from "./data";
 import { addDays, dayKey } from "./daily";
-import type { Clan, Comment, LedgerEntry, LostAlert, MomentType, Notification, Pet, Post, Reminder, Thread, Weight } from "./types";
+import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Notification, Pet, Playdate, Post, Reminder, Sticker, Story, Thread, Weight } from "./types";
 
 /* ---------------- Row → app model mapping ---------------- */
 
@@ -29,6 +29,7 @@ type PetRow = {
   post_count: number;
   birthday: string | null;
   gotcha_day: string | null;
+  personality: string | null;
 };
 
 type PostRow = {
@@ -48,6 +49,10 @@ type PostRow = {
   moderation_note: string | null;
   slides: number | null;
   daily_date: string | null;
+  tagged_pets: string[] | null;
+  frame: string | null;
+  stickers: Sticker[] | null;
+  edited_at: string | null;
   created_at: string;
   boop_count: number;
   comment_count: number;
@@ -74,6 +79,7 @@ const toPet = (r: PetRow): Pet => ({
   postCount: r.post_count,
   birthday: r.birthday ?? undefined,
   gotchaDay: r.gotcha_day ?? undefined,
+  personality: r.personality ?? undefined,
   clan: r.clan ?? "dogs",
   verified: r.verified,
   bg: r.bg,
@@ -93,7 +99,16 @@ export type Snapshot = {
   initialVotes: Record<string, string>;
   dailyVoteCounts: Record<string, Record<string, number>>; // day -> post -> votes
   alerts: LostAlert[];
+  stories: Story[];
+  myPets: string[]; // pets this account owns or helps manage
   mine: {
+    commentLikes: Record<string, true>;
+    collections: Collection[];
+    pawFivesSent: Record<string, string>; // pet -> last day I paw-fived them
+    playdates: Playdate[];
+    seenStories: Record<string, true>;
+    storyViewers: Record<string, string[]>; // my story -> viewer pets
+    family: { isOwner: boolean; members: number };
     dailyVotes: Record<string, string>; // day -> post I voted for
     myPostDays: string[];
     interactionDays: Record<string, string[]>; // pet -> days I interacted with them
@@ -164,6 +179,23 @@ const toAlert = (a: AlertRow): LostAlert => ({
   createdAt: Date.parse(a.created_at),
 });
 
+const PICK_KEY = (uid: string) => `floof:pet:${uid}`;
+function readPickedPet(uid: string) {
+  try {
+    return localStorage.getItem(PICK_KEY(uid));
+  } catch {
+    return null;
+  }
+}
+/** Switch which of my pets I'm using. */
+export function pickPet(uid: string, petId: string) {
+  try {
+    localStorage.setItem(PICK_KEY(uid), petId);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function loadSnapshot(): Promise<Snapshot> {
   const db = sb();
   const { data: auth } = await db.auth.getSession();
@@ -171,7 +203,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
 
   const today = dayKey();
   const yesterday = addDays(today, -1);
-  const [petRows, feedRows, clanRows, voteRows, entryRows, dailyRows, dailyVoteRows, alertRows] = await Promise.all([
+  const [petRows, feedRows, clanRows, voteRows, entryRows, dailyRows, dailyVoteRows, alertRows, storyRows, memberRows] = await Promise.all([
     db.from("pet_profiles").select("*").order("created_at", { ascending: true }).limit(1000),
     db.from("post_feed").select("*").order("created_at", { ascending: false }).limit(300),
     db.from("clan_totals").select("*"),
@@ -180,6 +212,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
     db.from("post_feed").select("*").gte("daily_date", addDays(today, -2)).order("created_at", { ascending: false }).limit(300),
     db.from("daily_votes").select("day, post_id, voter_id").gte("day", yesterday).limit(5000),
     db.from("lost_alerts").select("*").order("created_at", { ascending: false }).limit(100),
+    db.from("stories").select("*").gt("expires_at", new Date().toISOString()).order("created_at").limit(500),
+    userId ? db.from("pet_members").select("pet_id").eq("user_id", userId) : Promise.resolve({ data: [], error: null }),
   ]).then((r) => r.map((x, i) => (i >= 5 ? soft(x) : mustAny(x)))) as [
     PetRow[],
     PostRow[],
@@ -189,22 +223,54 @@ export async function loadSnapshot(): Promise<Snapshot> {
     PostRow[],
     { day: string; post_id: string; voter_id: string }[],
     AlertRow[],
+    { id: string; pet_id: string; image_url: string | null; text: string | null; bg: string; created_at: string; expires_at: string }[],
+    { pet_id: string }[],
   ];
-  // Today's / yesterday's Daily Floof answers, even if they're older than the main feed window.
-  const postRows = [...feedRows, ...dailyRows.filter((d) => !feedRows.some((f) => f.id === d.id))];
+
+  // Which pet am I? An account can own or help manage several; remember the last one picked.
+  const memberOf = new Set(memberRows.map((m) => m.pet_id));
+  const myPetRows = userId ? petRows.filter((p) => p.owner_id === userId || memberOf.has(p.id)) : [];
+  const myPets = myPetRows.map((p) => p.id);
+  const picked = userId ? readPickedPet(userId) : null;
+  const myPet = myPetRows.find((p) => p.id === picked) ?? myPetRows.find((p) => p.owner_id === userId) ?? myPetRows[0];
+  const myPetId = myPet?.id ?? null;
+
+  // Today's / yesterday's Daily Floof answers and posts I'm tagged in, even if older than the main feed window.
+  const taggedRows = myPetId
+    ? ((soft(await db.from("post_feed").select("*").contains("tagged_pets", [myPetId]).order("created_at", { ascending: false }).limit(100)) as PostRow[]) ?? [])
+    : [];
+  const postRows = [...feedRows];
+  for (const extra of [...dailyRows, ...taggedRows]) if (!postRows.some((f) => f.id === extra.id)) postRows.push(extra);
 
   const pets = petRows.map(toPet);
   const postIds = postRows.map((p) => p.id);
-  const commentRows = postIds.length
-    ? must(await db.from("comments").select("id, post_id, pet_id, text, likes, created_at").in("post_id", postIds).order("created_at"))
-    : [];
+  const commentRows = (postIds.length
+    ? must(await db.from("comments").select("*").in("post_id", postIds).order("created_at"))
+    : []) as { id: string; post_id: string; pet_id: string; text: string; likes: number; created_at: string; parent_id?: string | null }[];
+  const likeRows = (commentRows.length
+    ? soft(await db.from("comment_like_counts").select("*").in("comment_id", commentRows.map((c) => c.id)))
+    : []) as { comment_id: string; likes: number }[];
+  const likeCount = new Map(likeRows.map((l) => [l.comment_id, l.likes]));
   const commentsByPost: Record<string, Comment[]> = {};
-  for (const c of commentRows as { id: string; post_id: string; pet_id: string; text: string; likes: number; created_at: string }[]) {
-    (commentsByPost[c.post_id] ??= []).push({ id: c.id, petId: c.pet_id, text: c.text, likes: c.likes, ago: timeAgo(Date.parse(c.created_at)) });
+  for (const c of commentRows) {
+    (commentsByPost[c.post_id] ??= []).push({
+      id: c.id,
+      petId: c.pet_id,
+      text: c.text,
+      likes: c.likes + (likeCount.get(c.id) ?? 0),
+      parentId: c.parent_id ?? undefined,
+      ago: timeAgo(Date.parse(c.created_at)),
+    });
   }
-
-  const myPet = userId ? petRows.find((p) => p.owner_id === userId) : undefined;
-  const myPetId = myPet?.id ?? null;
+  const stories: Story[] = storyRows.map((s) => ({
+    id: s.id,
+    petId: s.pet_id,
+    image: s.image_url ?? undefined,
+    text: s.text ?? undefined,
+    bg: s.bg,
+    createdAt: Date.parse(s.created_at),
+    expiresAt: Date.parse(s.expires_at),
+  }));
 
   let mine: Snapshot["mine"] = null;
   let myBoops = new Set<string>();
@@ -230,7 +296,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
       { followee_id: string }[],
       { post_id: string; created_at: string }[],
       { id: string; kind: string; amount: number; counterparty_id: string | null; post_id: string | null; note: string | null; created_at: string }[],
-      { id: string; from_pet: string; to_pet: string; text: string; created_at: string }[],
+      { id: string; from_pet: string; to_pet: string; text: string; created_at: string; reply_to?: string | null }[],
       { event_id: string; status: "interested" | "going"; checked_in: boolean }[],
       { competition_id: string; post_id: string }[],
       { competition_id: string; post_id: string }[],
@@ -239,6 +305,31 @@ export async function loadSnapshot(): Promise<Snapshot> {
       { id: string; title: string; kind: Reminder["kind"]; due_date: string; repeat: Reminder["repeat"] }[],
       { id: string; measured_on: string; kg: number | string }[],
     ];
+
+    const myStoryIds = stories.filter((s) => s.petId === myPetId).map((s) => s.id);
+    const [myLikes, cols, colItems, pawRows, playRows, reactRows, seenRows, viewerRows, memberCount] = (await Promise.all([
+      db.from("comment_likes").select("comment_id").eq("pet_id", myPetId),
+      db.from("collections").select("*").eq("pet_id", myPetId).order("created_at"),
+      db.from("collection_items").select("collection_id, post_id, collections!inner(pet_id)").eq("collections.pet_id", myPetId),
+      db.from("paw_fives").select("*").or(`from_pet.eq.${myPetId},to_pet.eq.${myPetId}`).gte("day", addDays(today, -60)),
+      db.from("playdates").select("*").or(`from_pet.eq.${myPetId},to_pet.eq.${myPetId}`).order("starts_at"),
+      msgs.length ? db.from("message_reactions").select("*").in("message_id", msgs.map((m) => m.id)) : Promise.resolve({ data: [], error: null }),
+      db.from("story_views").select("story_id").eq("viewer_id", myPetId),
+      myStoryIds.length ? db.from("story_views").select("story_id, viewer_id").in("story_id", myStoryIds) : Promise.resolve({ data: [], error: null }),
+      db.from("pet_members").select("user_id").eq("pet_id", myPetId),
+    ]).then((r) => r.map(soft))) as [
+      { comment_id: string }[],
+      { id: string; name: string }[],
+      { collection_id: string; post_id: string }[],
+      { from_pet: string; to_pet: string; day: string; created_at: string }[],
+      { id: string; from_pet: string; to_pet: string; place: string; starts_at: string; note: string; status: Playdate["status"] }[],
+      { message_id: string; pet_id: string; emoji: string }[],
+      { story_id: string }[],
+      { story_id: string; viewer_id: string }[],
+      { user_id: string }[],
+    ];
+    const reactionsByMsg: Record<string, Record<string, string>> = {};
+    for (const r of reactRows) (reactionsByMsg[r.message_id] ??= {})[r.pet_id] = r.emoji;
 
     // Which days I interacted with each pet (for best-friend streaks).
     const days: Record<string, Set<string>> = {};
@@ -289,6 +380,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
         id: m.id,
         from: m.from_pet === myPetId ? "me" : m.from_pet,
         text: m.text,
+        replyTo: m.reply_to ?? undefined,
+        reactions: reactionsByMsg[m.id],
         ts: Date.parse(m.created_at),
         at: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       });
@@ -296,7 +389,20 @@ export async function loadSnapshot(): Promise<Snapshot> {
 
     myBoops = new Set(boops.map((b) => b.post_id));
     myFollows = new Set(follows.map((f) => f.followee_id));
+    for (const p of pawRows) if (p.from_pet === myPetId) mark(p.to_pet, p.created_at);
+    const pawFivesSent: Record<string, string> = {};
+    for (const p of pawRows) if (p.from_pet === myPetId && (pawFivesSent[p.to_pet] ?? "") < p.day) pawFivesSent[p.to_pet] = p.day;
+    const storyViewers: Record<string, string[]> = {};
+    for (const v of viewerRows) (storyViewers[v.story_id] ??= []).push(v.viewer_id);
+
     mine = {
+      commentLikes: Object.fromEntries(myLikes.map((l) => [l.comment_id, true as const])),
+      collections: cols.map((c) => ({ id: c.id, name: c.name, postIds: colItems.filter((i) => i.collection_id === c.id).map((i) => i.post_id) })),
+      pawFivesSent,
+      playdates: playRows.map((p) => ({ id: p.id, fromPet: p.from_pet, toPet: p.to_pet, place: p.place, startsAt: Date.parse(p.starts_at), note: p.note, status: p.status })),
+      seenStories: Object.fromEntries(seenRows.map((v) => [v.story_id, true as const])),
+      storyViewers,
+      family: { isOwner: myPet!.owner_id === userId, members: memberCount.length },
       dailyVotes: Object.fromEntries(dailyVoteRows.filter((v) => v.voter_id === myPetId).map((v) => [v.day, v.post_id])),
       myPostDays: [...new Set(myPostDates.map((p) => dayKey(new Date(p.created_at))))],
       interactionDays: Object.fromEntries(Object.entries(days).map(([k, v]) => [k, [...v]])),
@@ -337,6 +443,10 @@ export async function loadSnapshot(): Promise<Snapshot> {
     moderationNote: r.moderation_note ?? undefined,
     slides: r.slides ?? undefined,
     dailyDate: r.daily_date ?? undefined,
+    taggedPets: r.tagged_pets?.length ? r.tagged_pets : undefined,
+    frame: r.frame ?? undefined,
+    stickers: r.stickers?.length ? r.stickers : undefined,
+    editedAt: r.edited_at ? Date.parse(r.edited_at) : undefined,
     boops: r.boop_count - (myBoops.has(r.id) ? 1 : 0),
     biscuits: r.biscuit_count,
     commentCount: r.comment_count,
@@ -384,6 +494,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
     initialVotes: mine?.votes ?? {},
     dailyVoteCounts,
     alerts,
+    stories,
+    myPets,
     mine,
   };
 }
@@ -429,6 +541,63 @@ export async function moderatePost(postId: string): Promise<{ status: string; me
 }
 
 export const remote = {
+  async updatePost(id: string, patch: { caption?: string; tags?: string[]; location?: string | null; tagged_pets?: string[] }) {
+    check(await sb().from("posts").update(patch).eq("id", id));
+  },
+  async commentLike(on: boolean, commentId: string, pet: string) {
+    const q = sb().from("comment_likes");
+    check(on ? await q.upsert({ comment_id: commentId, pet_id: pet }, { ignoreDuplicates: true }) : await q.delete().match({ comment_id: commentId, pet_id: pet }));
+  },
+  async react(messageId: string, pet: string, emoji: string | null) {
+    const q = sb().from("message_reactions");
+    check(emoji ? await q.upsert({ message_id: messageId, pet_id: pet, emoji }) : await q.delete().match({ message_id: messageId, pet_id: pet }));
+  },
+  async postStory(st: Story) {
+    const image = st.image?.startsWith("data:") ? await uploadPhoto(st.image, "story") : st.image;
+    check(await sb().from("stories").insert({ id: st.id, pet_id: st.petId, image_url: image ?? null, text: st.text ?? null, bg: st.bg }));
+  },
+  async deleteStory(id: string) {
+    check(await sb().from("stories").delete().eq("id", id));
+  },
+  async viewStory(id: string, pet: string) {
+    await sb().from("story_views").upsert({ story_id: id, viewer_id: pet }, { ignoreDuplicates: true });
+  },
+  async createCollection(pet: string, c: Collection) {
+    check(await sb().from("collections").insert({ id: c.id, pet_id: pet, name: c.name }));
+    if (c.postIds.length) check(await sb().from("collection_items").insert(c.postIds.map((post_id) => ({ collection_id: c.id, post_id }))));
+  },
+  async renameCollection(id: string, name: string) {
+    check(await sb().from("collections").update({ name }).eq("id", id));
+  },
+  async deleteCollection(id: string) {
+    check(await sb().from("collections").delete().eq("id", id));
+  },
+  async collectionItem(on: boolean, collectionId: string, postId: string) {
+    const q = sb().from("collection_items");
+    check(on ? await q.upsert({ collection_id: collectionId, post_id: postId }, { ignoreDuplicates: true }) : await q.delete().match({ collection_id: collectionId, post_id: postId }));
+  },
+  async pawFive(from: string, to: string) {
+    check(await sb().from("paw_fives").insert({ from_pet: from, to_pet: to }));
+  },
+  async invitePlaydate(p: Playdate) {
+    check(await sb().from("playdates").insert({ id: p.id, from_pet: p.fromPet, to_pet: p.toPet, place: p.place, starts_at: new Date(p.startsAt).toISOString(), note: p.note }));
+  },
+  async playdateStatus(id: string, status: Playdate["status"]) {
+    check(await sb().from("playdates").update({ status }).eq("id", id));
+  },
+  async createFamilyInvite(pet: string): Promise<string> {
+    const res = await sb().rpc("create_family_invite", { p_pet: pet });
+    check(res);
+    return res.data as string;
+  },
+  async acceptFamilyInvite(code: string): Promise<string> {
+    const res = await sb().rpc("accept_family_invite", { p_code: code });
+    check(res);
+    return res.data as string;
+  },
+  async leaveFamily(pet: string, userId: string) {
+    check(await sb().from("pet_members").delete().match({ pet_id: pet, user_id: userId }));
+  },
   async dailyVote(day: string, voter: string, postId: string | null) {
     const q = sb().from("daily_votes");
     check(postId ? await q.upsert({ day, voter_id: voter, post_id: postId }) : await q.delete().match({ day, voter_id: voter }));
@@ -509,7 +678,7 @@ export const remote = {
   },
   async updatePet(
     id: string,
-    patch: Partial<{ clan: Clan; meetups_opt_in: boolean; name: string; bio: string[]; photo_url: string | null; breed: string; age: string; city: string; birthday: string | null; gotcha_day: string | null }>,
+    patch: Partial<{ clan: Clan; meetups_opt_in: boolean; name: string; bio: string[]; photo_url: string | null; personality: string; breed: string; age: string; city: string; birthday: string | null; gotcha_day: string | null }>,
   ) {
     const res = await sb().from("pets").update(patch).eq("id", id);
     // If the database hasn't been updated with the birthday columns yet, save everything else.
@@ -531,8 +700,8 @@ export const remote = {
     const row = { follower_id: follower, followee_id: followee };
     check(on ? await q.upsert(row, { ignoreDuplicates: true }) : await q.delete().match(row));
   },
-  async comment(postId: string, petId: string, text: string) {
-    check(await sb().from("comments").insert({ post_id: postId, pet_id: petId, text }));
+  async comment(postId: string, petId: string, text: string, parentId?: string, id?: string) {
+    check(await sb().from("comments").insert({ ...(id ? { id } : {}), post_id: postId, pet_id: petId, text, parent_id: parentId ?? null }));
   },
   async post(p: Post) {
     const all = p.images?.length ? p.images : p.image ? [p.image] : [];
@@ -553,6 +722,9 @@ export const remote = {
         location: p.location ?? null,
         moment: p.moment ?? null,
         daily_date: p.dailyDate ?? null,
+        ...(p.taggedPets?.length ? { tagged_pets: p.taggedPets } : {}),
+        ...(p.frame ? { frame: p.frame } : {}),
+        ...(p.stickers?.length ? { stickers: p.stickers } : {}),
       }),
     );
   },
@@ -582,8 +754,8 @@ export const remote = {
     const q = sb().from("pack_members");
     check(on ? await q.upsert({ pack_id: packId, pet_id: petId }, { ignoreDuplicates: true }) : await q.delete().match({ pack_id: packId, pet_id: petId }));
   },
-  async message(from: string, to: string, text: string) {
-    check(await sb().from("messages").insert({ from_pet: from, to_pet: to, text }));
+  async message(from: string, to: string, text: string, replyTo?: string, id?: string) {
+    check(await sb().from("messages").insert({ ...(id ? { id } : {}), from_pet: from, to_pet: to, text, reply_to: replyTo ?? null }));
   },
 };
 
@@ -629,6 +801,35 @@ export async function loadNotifications(petId: string): Promise<Notification[]> 
         ago: "",
       })),
   ];
+
+  // Newer social activity (quietly skipped if those tables aren't set up yet).
+  const [replies, likes, tagged, paws, plays] = (await Promise.all([
+    db.from("comments").select("id, pet_id, post_id, text, created_at, parent:comments!parent_id!inner(pet_id)").eq("parent.pet_id", petId).neq("pet_id", petId).order("created_at", { ascending: false }).limit(30),
+    db.from("comment_likes").select("pet_id, created_at, comments!inner(pet_id, post_id, text)").eq("comments.pet_id", petId).neq("pet_id", petId).order("created_at", { ascending: false }).limit(30),
+    db.from("posts").select("id, pet_id, created_at").contains("tagged_pets", [petId]).eq("status", "approved").order("created_at", { ascending: false }).limit(30),
+    db.from("paw_fives").select("from_pet, created_at").eq("to_pet", petId).order("created_at", { ascending: false }).limit(30),
+    db.from("playdates").select("id, from_pet, to_pet, place, status, created_at").or(`and(to_pet.eq.${petId},status.eq.pending),and(from_pet.eq.${petId},status.eq.accepted)`).order("created_at", { ascending: false }).limit(30),
+  ]).then((r) => r.map(soft))) as [
+    { id: string; pet_id: string; post_id: string; text: string; created_at: string }[],
+    { pet_id: string; created_at: string; comments: { post_id: string; text: string } }[],
+    { id: string; pet_id: string; created_at: string }[],
+    { from_pet: string; created_at: string }[],
+    { id: string; from_pet: string; to_pet: string; place: string; status: string; created_at: string }[],
+  ];
+  list.push(
+    ...replies.map((r) => ({ id: `r${r.id}`, petId: r.pet_id, kind: "reply" as const, text: `replied to your comment: “${r.text}”`, postId: r.post_id, t: Date.parse(r.created_at), ago: "" })),
+    ...likes.map((l, i) => ({ id: `l${i}`, petId: l.pet_id, kind: "commentLike" as const, text: `liked your comment: “${l.comments.text}”`, postId: l.comments.post_id, t: Date.parse(l.created_at), ago: "" })),
+    ...tagged.filter((p) => p.pet_id !== petId).map((p) => ({ id: `t${p.id}`, petId: p.pet_id, kind: "tag" as const, text: "tagged you in a floof", postId: p.id, t: Date.parse(p.created_at), ago: "" })),
+    ...paws.map((p, i) => ({ id: `p${i}`, petId: p.from_pet, kind: "pawfive" as const, text: "sent you a paw-five 🐾", t: Date.parse(p.created_at), ago: "" })),
+    ...plays.map((p) => ({
+      id: `pd${p.id}`,
+      petId: p.to_pet === petId ? p.from_pet : p.to_pet,
+      kind: "playdate" as const,
+      text: p.to_pet === petId ? `invited you to a playdate at ${p.place} 🎾` : `accepted your playdate at ${p.place} 🎉`,
+      t: Date.parse(p.created_at),
+      ago: "",
+    })),
+  );
   return list
     .sort((a, b) => b.t - a.t)
     .slice(0, 50)
@@ -686,5 +887,24 @@ export async function loadRecap(petId: string): Promise<Recap> {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([id]) => id),
+  };
+}
+
+/** Live reactions on my messages. Returns an unsubscribe function. */
+export function subscribeToReactions(onChange: (r: { message_id: string; pet_id: string; emoji: string | null }) => void) {
+  const channel = sb()
+    .channel("reactions")
+    .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, (payload) => {
+      if (payload.eventType === "DELETE") {
+        const old = payload.old as { message_id?: string; pet_id?: string };
+        if (old.message_id && old.pet_id) onChange({ message_id: old.message_id, pet_id: old.pet_id, emoji: null });
+      } else {
+        const row = payload.new as { message_id: string; pet_id: string; emoji: string };
+        onChange(row);
+      }
+    })
+    .subscribe();
+  return () => {
+    void sb().removeChannel(channel);
   };
 }

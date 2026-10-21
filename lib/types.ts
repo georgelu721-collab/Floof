@@ -54,6 +54,7 @@ export type Pet = {
   ownerId?: string | null; // null = Floof house pet
   birthday?: string; // YYYY-MM-DD
   gotchaDay?: string; // YYYY-MM-DD
+  personality?: string; // quiz result, e.g. "Chaotic Snuggler"
   clan: Clan;
   verified?: boolean;
   bg: string; // avatar background tint
@@ -76,7 +77,8 @@ export type Comment = {
   petId: string;
   text: string;
   ago: string;
-  likes: number;
+  likes: number; // total likes (sample base + real)
+  parentId?: string; // set on replies
 };
 
 export type Post = {
@@ -101,13 +103,17 @@ export type Post = {
   slides?: number;
   status?: "pending" | "approved" | "rejected"; // photo check (cloud mode)
   dailyDate?: string; // YYYY-MM-DD of the Daily Floof prompt this answers
+  taggedPets?: string[];
+  frame?: string;
+  stickers?: Sticker[];
+  editedAt?: number;
   moderationNote?: string;
 };
 
 export type Notification = {
   id: string;
   petId: string;
-  kind: "boop" | "comment" | "follow" | "biscuit" | "mention" | "pack" | "trending" | "bestfriend";
+  kind: "boop" | "comment" | "follow" | "biscuit" | "mention" | "pack" | "trending" | "bestfriend" | "reply" | "commentLike" | "tag" | "pawfive" | "playdate";
   text: string;
   ago: string;
   postId?: string;
@@ -179,7 +185,7 @@ export type Thread = {
   id: string;
   petIds: string[];
   title: string;
-  messages: { id: string; from: string; text: string; at: string; ts?: number }[];
+  messages: Message[];
 };
 
 export type Reminder = {
@@ -205,4 +211,38 @@ export type LostAlert = {
   photo?: string;
   status: "active" | "resolved";
   createdAt: number;
+};
+
+export type Sticker = { e: string; x: number; y: number }; // emoji at x/y % of the photo
+
+export type Message = {
+  id: string;
+  from: string; // "me" or a pet id
+  text: string;
+  at: string;
+  ts?: number;
+  replyTo?: string;
+  reactions?: Record<string, string>; // pet id -> emoji
+};
+
+export type Story = {
+  id: string;
+  petId: string;
+  image?: string;
+  text?: string;
+  bg: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
+export type Collection = { id: string; name: string; postIds: string[] };
+
+export type Playdate = {
+  id: string;
+  fromPet: string;
+  toPet: string;
+  place: string;
+  startsAt: number;
+  note: string;
+  status: "pending" | "accepted" | "declined" | "cancelled";
 };

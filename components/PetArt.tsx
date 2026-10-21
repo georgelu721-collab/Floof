@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { Accessory, Expression, Pet, Scene } from "@/lib/types";
+import type { Accessory, Expression, Pet, Scene, Sticker } from "@/lib/types";
 
 const INK = "#4A2E22";
 
@@ -547,7 +547,76 @@ export function PetScene({
   );
 }
 
-type MediaPost = { scene: Scene; accessory: Accessory; expression: Expression; image?: string; images?: string[]; overlay?: string };
+type MediaPost = {
+  scene: Scene;
+  accessory: Accessory;
+  expression: Expression;
+  image?: string;
+  images?: string[];
+  overlay?: string;
+  frame?: string;
+  stickers?: Sticker[];
+};
+
+export const FRAMES: { id: string; label: string }[] = [
+  { id: "", label: "No frame" },
+  { id: "polaroid", label: "📷 Polaroid" },
+  { id: "hearts", label: "💗 Hearts" },
+  { id: "party", label: "🎉 Party" },
+  { id: "paws", label: "🐾 Paws" },
+  { id: "home", label: "🏡 First Day Home" },
+  { id: "gold", label: "✨ Gold" },
+];
+
+export const STICKERS = ["💖", "🐾", "⭐", "🎀", "👑", "🦴", "🎾", "🌸", "😎", "💬", "🔥", "🍪", "🎉", "🌈", "😴", "🧸"];
+
+/** Decorations drawn on top of a photo: a frame and draggable emoji stickers (positions in %). */
+export function Decorations({ frame, stickers, onStickerPointerDown }: { frame?: string; stickers?: Sticker[]; onStickerPointerDown?: (i: number, e: React.PointerEvent) => void }) {
+  return (
+    <>
+      {frame === "polaroid" && <div className="pointer-events-none absolute inset-0 border-[5cqw] border-b-[16cqw] border-white shadow-[inset_0_0_0_1px_rgba(0,0,0,.06)]" />}
+      {frame === "gold" && <div className="pointer-events-none absolute inset-0 border-[3cqw] border-[#E9C46A] shadow-[inset_0_0_0_2px_#B8860B]" />}
+      {frame === "hearts" && <EdgeEmoji emoji="💗" />}
+      {frame === "paws" && <EdgeEmoji emoji="🐾" />}
+      {frame === "party" && (
+        <>
+          <EdgeEmoji emoji="🎉" />
+          <span className="pointer-events-none absolute left-[4%] top-[3%] text-[11cqw]">🎈</span>
+        </>
+      )}
+      {frame === "home" && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cocoa/80 to-transparent px-[5cqw] pb-[4cqw] pt-[10cqw] text-center font-hand text-[9cqw] leading-none text-white">
+          First Day Home 🏡
+        </div>
+      )}
+      {stickers?.map((st, i) => (
+        <span
+          key={i}
+          onPointerDown={onStickerPointerDown ? (e) => onStickerPointerDown(i, e) : undefined}
+          className={`absolute -translate-x-1/2 -translate-y-1/2 select-none text-[13cqw] leading-none drop-shadow ${onStickerPointerDown ? "pointer-events-auto cursor-grab touch-none" : "pointer-events-none"}`}
+          style={{ left: `${st.x}%`, top: `${st.y}%` }}
+        >
+          {st.e}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function EdgeEmoji({ emoji }: { emoji: string }) {
+  const spots = [
+    [6, 6], [30, 3], [55, 5], [80, 3], [94, 8], [96, 35], [95, 62], [94, 90], [70, 96], [45, 95], [20, 96], [5, 92], [4, 65], [3, 38],
+  ];
+  return (
+    <>
+      {spots.map(([x, y], i) => (
+        <span key={i} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-[7cqw] leading-none" style={{ left: `${x}%`, top: `${y}%` }}>
+          {emoji}
+        </span>
+      ))}
+    </>
+  );
+}
 
 /** All photos of a post, cover first. */
 export function photosOf(post: { image?: string; images?: string[] }) {
@@ -578,10 +647,10 @@ export function PostMedia({
     </span>
   );
 
-  if (carousel && multi) return <Carousel photos={photos} overlay={overlay} className={className} />;
+  if (carousel && multi) return <Carousel photos={photos} overlay={overlay} className={className} post={post} />;
 
   return (
-    <div className={`relative overflow-hidden bg-sand ${className}`}>
+    <div className={`relative overflow-hidden bg-sand ${className}`} style={{ containerType: "inline-size" }}>
       {cover && broken !== cover ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={cover} alt="" loading="lazy" onError={() => setBroken(cover)} className="absolute inset-0 h-full w-full object-cover" />
@@ -589,6 +658,7 @@ export function PostMedia({
         <PetScene pet={pet} scene={post.scene} accessory={post.accessory} expression={post.expression} className="absolute inset-0 h-full w-full" />
       )}
       {overlay}
+      <Decorations frame={post.frame} stickers={post.stickers} />
       {multi && (
         <span className="absolute right-2 top-2 text-white drop-shadow" aria-label={`${photos.length} photos`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round">
@@ -601,7 +671,7 @@ export function PostMedia({
   );
 }
 
-function Carousel({ photos, overlay, className }: { photos: string[]; overlay: React.ReactNode; className: string }) {
+function Carousel({ photos, overlay, className, post }: { photos: string[]; overlay: React.ReactNode; className: string; post: MediaPost }) {
   const [index, setIndex] = useState(0);
   const [track, setTrack] = useState<HTMLDivElement | null>(null);
 
@@ -612,7 +682,7 @@ function Carousel({ photos, overlay, className }: { photos: string[]; overlay: R
   };
 
   return (
-    <div className={`group relative overflow-hidden bg-sand ${className}`}>
+    <div className={`group relative overflow-hidden bg-sand ${className}`} style={{ containerType: "inline-size" }}>
       <div
         ref={setTrack}
         onScroll={(e) => {
@@ -634,6 +704,7 @@ function Carousel({ photos, overlay, className }: { photos: string[]; overlay: R
         ))}
       </div>
       {index === 0 && overlay}
+      {index === 0 && <Decorations frame={post.frame} stickers={post.stickers} />}
 
       <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-cocoa/70 px-2.5 py-0.5 text-xs font-bold text-white">
         {index + 1}/{photos.length}

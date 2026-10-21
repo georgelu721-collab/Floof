@@ -10,6 +10,7 @@ import { Page } from "@/components/Shell";
 import { BiscuitIcon, IconBell, IconChat, PawIcon } from "@/components/Icons";
 import { ClanWarMini } from "@/components/ClanWar";
 import { DailyCard, Nudges, StarterChecklist } from "@/components/HomeCards";
+import { StoryBar } from "@/components/StoryBar";
 
 const TABS = ["For you", "Following", "Moments"] as const;
 
@@ -17,7 +18,6 @@ export default function Home() {
   const { posts, pets, me, s, loadError, reload, ready, signedIn, cloud } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]>("For you");
 
-  const storyPets = pets.filter((p) => p.id !== me.id).slice(0, 9);
   const feed =
     tab === "Following"
       ? posts.filter((p) => s.following[p.petId] || p.petId === me.id)
@@ -46,21 +46,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-3 pt-1">
-        <Link href="/create?type=story" className="flex w-[70px] shrink-0 flex-col items-center gap-1">
-          <span className="relative">
-            <PetAvatar pet={me} size={66} ring="seen" />
-            <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-cocoa text-sm font-black text-white ring-2 ring-cream">+</span>
-          </span>
-          <span className="w-full truncate text-center text-xs font-bold">Your story</span>
-        </Link>
-        {storyPets.map((p, i) => (
-          <Link key={p.id} href={`/story/${p.id}`} className="flex w-[70px] shrink-0 flex-col items-center gap-1">
-            <PetAvatar pet={p} size={66} ring={i < 6 ? "story" : "seen"} />
-            <span className="w-full truncate text-center text-xs font-bold">{p.name}</span>
-          </Link>
-        ))}
-      </div>
+      <StoryBar />
 
       {!loadError && ready && (
         <>

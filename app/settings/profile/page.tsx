@@ -7,10 +7,12 @@ import { currentSubscription, disablePush, enablePush, pushSupport } from "@/lib
 import { useStore } from "@/lib/store";
 import { PetAvatar } from "@/components/PetArt";
 import { Page, SectionTitle, TopBar } from "@/components/Shell";
+import { FamilyCard } from "@/components/FamilyCard";
+import { PetSwitcher } from "@/components/PetSwitcher";
 
 export default function EditProfile() {
   const router = useRouter();
-  const { me, s, dispatch, signedIn, ready, toast, cloud } = useStore();
+  const { me, s, dispatch, signedIn, ready, toast, cloud, myPets } = useStore();
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [breed, setBreed] = useState("");
@@ -22,6 +24,7 @@ export default function EditProfile() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [push, setPush] = useState<"on" | "off" | "busy">("off");
+  const [switcher, setSwitcher] = useState(false);
   const support = typeof window === "undefined" ? "unsupported" : pushSupport();
 
   useEffect(() => {
@@ -36,6 +39,9 @@ export default function EditProfile() {
     setPhoto(me.photo);
     setLoaded(true);
   }, [ready, loaded, signedIn, me]);
+
+  // Reload the form when switching to another pet.
+  useEffect(() => setLoaded(false), [me.id]);
 
   useEffect(() => {
     currentSubscription().then((sub) => setPush(sub ? "on" : "off"), () => undefined);
@@ -193,6 +199,10 @@ export default function EditProfile() {
             <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${s.meetupsOptIn ? "left-6" : "left-1"}`} />
           </button>
         </div>
+        <FamilyCard />
+        <button className="w-full py-3 text-left font-extrabold" onClick={() => setSwitcher(true)}>
+          🐾 Switch or add pets <span className="text-sm font-semibold text-muted">({myPets.length})</span>
+        </button>
         <button
           className="w-full py-3 text-left font-extrabold text-blush"
           onClick={() => {
@@ -202,6 +212,7 @@ export default function EditProfile() {
           Log out
         </button>
       </section>
+      {switcher && <PetSwitcher onClose={() => setSwitcher(false)} />}
     </Page>
   );
 }

@@ -3,9 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AFFINITY, DEMO_ALERTS, DEMO_PET_ID, demoReminders, PETS, POSTS } from "./data";
 import { CLOUD, sb } from "./supabase";
-import { loadSnapshot, moderatePost, remote, subscribeToMessages, uploadPhoto, type Snapshot } from "./cloud";
+import { loadSnapshot, moderatePost, pickPet, remote, subscribeToMessages, subscribeToReactions, uploadPhoto, type Snapshot } from "./cloud";
 import { addDays, dailyStreak, dayKey, fromKey, levelFor, postingStreak } from "./daily";
-import type { Clan, Comment, LedgerEntry, LostAlert, MomentType, Pet, Post, Reminder, Thread, Weight } from "./types";
+import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Pet, Playdate, Post, Reminder, Story, Thread, Weight } from "./types";
 
 type State = {
   me: string | null;
@@ -37,6 +37,15 @@ type State = {
   alerts: LostAlert[]; // local demo alerts, plus ones I just posted (cloud)
   resolvedAlerts: Record<string, true>;
   meEdits: Partial<Pet>; // local demo: edits to a built-in pet
+  commentLikes: Record<string, true>;
+  collections: Collection[];
+  pawFivesSent: Record<string, string>; // pet -> day
+  playdates: Playdate[];
+  seenStories: Record<string, true>;
+  myStories: Story[]; // stories I just posted (cloud) or all local stories
+  deletedStories: Record<string, true>;
+  postEdits: Record<string, Partial<Post>>;
+  localPets: string[]; // local demo: pets used on this device
 };
 
 const initial: State = {
@@ -69,6 +78,15 @@ const initial: State = {
   alerts: [],
   resolvedAlerts: {},
   meEdits: {},
+  commentLikes: {},
+  collections: [],
+  pawFivesSent: {},
+  playdates: [],
+  seenStories: {},
+  myStories: [],
+  deletedStories: {},
+  postEdits: {},
+  localPets: [],
 };
 
 export type Action =
@@ -79,7 +97,7 @@ export type Action =
   | { t: "boop"; postId: string; petId: string }
   | { t: "save"; postId: string }
   | { t: "follow"; petId: string }
-  | { t: "comment"; postId: string; petId: string; text: string }
+  | { t: "comment"; postId: string; petId: string; text: string; parentId?: string; id?: string }
   | { t: "post"; post: Post }
   | { t: "deletePost"; postId: string }
   | { t: "sendBiscuits"; petId: string; amount: number; note?: string; postId?: string }
@@ -93,7 +111,7 @@ export type Action =
   | { t: "vote"; compId: string; postId: string; petId: string }
   | { t: "pack"; id: string }
   | { t: "meetupsOptIn"; on: boolean }
-  | { t: "message"; threadId: string; text: string; petIds: string[] }
+  | { t: "message"; threadId: string; text: string; petIds: string[]; replyTo?: string; id?: string }
   | { t: "incoming"; threadId: string; msg: Thread["messages"][number]; petId: string }
   | { t: "updateMe"; patch: Partial<Pet> }
   | { t: "dailyVote"; day: string; postId: string | null; petId: string }
@@ -103,7 +121,22 @@ export type Action =
   | { t: "addWeight"; weight: Weight }
   | { t: "deleteWeight"; id: string }
   | { t: "postAlert"; alert: LostAlert }
-  | { t: "resolveAlert"; id: string };
+  | { t: "resolveAlert"; id: string }
+  | { t: "editPost"; postId: string; patch: { caption?: string; tags?: string[]; location?: string; taggedPets?: string[] } }
+  | { t: "commentLike"; commentId: string; petId: string }
+  | { t: "react"; threadId: string; messageId: string; emoji: string | null }
+  | { t: "incomingReaction"; messageId: string; petId: string; emoji: string | null }
+  | { t: "postStory"; story: Story }
+  | { t: "deleteStory"; id: string }
+  | { t: "viewStory"; id: string }
+  | { t: "createCollection"; collection: Collection }
+  | { t: "renameCollection"; id: string; name: string }
+  | { t: "deleteCollection"; id: string }
+  | { t: "collectionItem"; collectionId: string; postId: string; on: boolean }
+  | { t: "pawFive"; petId: string }
+  | { t: "invitePlaydate"; playdate: Playdate }
+  | { t: "playdateStatus"; id: string; status: Playdate["status"] }
+  | { t: "switchPet"; petId: string };
 
 const bump = (m: Record<string, number>, id: string, n: number) => ({ ...m, [id]: (m[id] ?? 0) + n });
 /** Remember that I interacted with a pet today (for best-friend streaks). */
@@ -122,18 +155,36 @@ function nextDue(r: Reminder) {
   return dayKey(d);
 }
 const uid = () => Math.random().toString(36).slice(2, 10);
+const uuid = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ (Math.random() * 16) >> (+c / 4)).toString(16));
+const withReaction = (threads: State["threads"], messageId: string, petId: string, emoji: string | null) => {
+  const out: State["threads"] = {};
+  for (const [k, msgs] of Object.entries(threads)) {
+    out[k] = msgs.map((m) => {
+      if (m.id !== messageId) return m;
+      const reactions = { ...(m.reactions ?? {}) };
+      if (emoji) reactions[petId] = emoji;
+      else delete reactions[petId];
+      return { ...m, reactions };
+    });
+  }
+  return out;
+};
 
 function reducer(s: State, a: Action): State {
   switch (a.t) {
     case "hydrate":
       return { ...s, ...a.s };
     case "login":
-      return { ...s, me: a.id };
+      return { ...s, me: a.id, localPets: [...new Set([...s.localPets, a.id])] };
     case "createPet":
       return {
         ...s,
         customPets: [...s.customPets.filter((p) => p.id !== a.pet.id), a.pet],
         me: a.pet.id,
+        localPets: [...new Set([...s.localPets, ...(s.me ? [s.me] : []), a.pet.id])],
         following: a.follow ? Object.fromEntries(a.follow.map((id) => [id, true as const])) : s.following,
         packs: a.packs ? Object.fromEntries(a.packs.map((id) => [id, true as const])) : s.packs,
         clan: a.pet.clan,
@@ -165,7 +216,7 @@ function reducer(s: State, a: Action): State {
       return { ...s, following, interactions: bump(s.interactions, a.petId, following[a.petId] ? 3 : -3) };
     }
     case "comment": {
-      const c: Comment = { id: uid(), petId: s.me ?? DEMO_PET_ID, text: a.text, ago: "now", likes: 0 };
+      const c: Comment = { id: a.id ?? uuid(), petId: s.me ?? DEMO_PET_ID, text: a.text, ago: "now", likes: 0, parentId: a.parentId };
       return {
         ...s,
         comments: { ...s.comments, [a.postId]: [...(s.comments[a.postId] ?? []), c] },
@@ -225,7 +276,7 @@ function reducer(s: State, a: Action): State {
     case "meetupsOptIn":
       return { ...s, meetupsOptIn: a.on };
     case "message": {
-      const msg = { id: uid(), from: "me", text: a.text, at: "now", ts: Date.now() };
+      const msg = { id: a.id ?? uuid(), from: "me", text: a.text, at: "now", ts: Date.now(), replyTo: a.replyTo };
       let interactions = s.interactions;
       let interactionDays = s.interactionDays;
       for (const p of a.petIds) {
@@ -268,6 +319,47 @@ function reducer(s: State, a: Action): State {
       return { ...s, weights: s.weights.filter((w) => w.id !== a.id) };
     case "postAlert":
       return { ...s, alerts: [a.alert, ...s.alerts] };
+    case "editPost":
+      return { ...s, postEdits: { ...s.postEdits, [a.postId]: { ...(s.postEdits[a.postId] ?? {}), ...a.patch, editedAt: Date.now() } } };
+    case "commentLike": {
+      const commentLikes = { ...s.commentLikes };
+      const on = !commentLikes[a.commentId];
+      if (on) commentLikes[a.commentId] = true;
+      else delete commentLikes[a.commentId];
+      return { ...s, commentLikes, interactionDays: on ? touch(s.interactionDays, a.petId) : s.interactionDays };
+    }
+    case "react":
+      return { ...s, threads: withReaction(s.threads, a.messageId, s.me ?? DEMO_PET_ID, a.emoji) };
+    case "incomingReaction":
+      return { ...s, threads: withReaction(s.threads, a.messageId, a.petId, a.emoji) };
+    case "postStory":
+      return { ...s, myStories: [...s.myStories, a.story] };
+    case "deleteStory":
+      return { ...s, myStories: s.myStories.filter((x) => x.id !== a.id), deletedStories: { ...s.deletedStories, [a.id]: true } };
+    case "viewStory":
+      return s.seenStories[a.id] ? s : { ...s, seenStories: { ...s.seenStories, [a.id]: true } };
+    case "createCollection":
+      return { ...s, collections: [...s.collections, a.collection] };
+    case "renameCollection":
+      return { ...s, collections: s.collections.map((c) => (c.id === a.id ? { ...c, name: a.name } : c)) };
+    case "deleteCollection":
+      return { ...s, collections: s.collections.filter((c) => c.id !== a.id) };
+    case "collectionItem":
+      return {
+        ...s,
+        collections: s.collections.map((c) =>
+          c.id !== a.collectionId ? c : { ...c, postIds: a.on ? [...new Set([...c.postIds, a.postId])] : c.postIds.filter((p) => p !== a.postId) },
+        ),
+        saved: a.on ? { ...s.saved, [a.postId]: true } : s.saved,
+      };
+    case "pawFive":
+      return { ...s, pawFivesSent: { ...s.pawFivesSent, [a.petId]: dayKey() }, interactionDays: touch(s.interactionDays, a.petId), interactions: bump(s.interactions, a.petId, 2) };
+    case "invitePlaydate":
+      return { ...s, playdates: [...s.playdates, a.playdate] };
+    case "playdateStatus":
+      return { ...s, playdates: s.playdates.map((p) => (p.id === a.id ? { ...p, status: a.status } : p)) };
+    case "switchPet":
+      return { ...s, me: a.petId };
     case "resolveAlert":
       return {
         ...s,
@@ -287,7 +379,7 @@ async function syncAction(a: Action, before: State, me: string) {
     case "follow":
       return remote.follow(!before.following[a.petId], me, a.petId);
     case "comment":
-      return remote.comment(a.postId, me, a.text);
+      return remote.comment(a.postId, me, a.text, a.parentId, a.id);
     case "post":
       return remote.post(a.post);
     case "deletePost":
@@ -313,11 +405,12 @@ async function syncAction(a: Action, before: State, me: string) {
     case "meetupsOptIn":
       return remote.updatePet(me, { meetups_opt_in: a.on });
     case "message":
-      return remote.message(me, a.petIds[0], a.text);
+      return remote.message(me, a.petIds[0], a.text, a.replyTo, a.id);
     case "updateMe": {
       const photo = a.patch.photo?.startsWith("data:") ? await uploadPhoto(a.patch.photo, "avatar") : a.patch.photo;
       const patch: Parameters<typeof remote.updatePet>[1] = {};
       if (a.patch.name !== undefined) patch.name = a.patch.name;
+      if (a.patch.personality !== undefined) patch.personality = a.patch.personality;
       if (a.patch.bio !== undefined) patch.bio = a.patch.bio;
       if (a.patch.breed !== undefined) patch.breed = a.patch.breed;
       if (a.patch.age !== undefined) patch.age = a.patch.age;
@@ -346,6 +439,39 @@ async function syncAction(a: Action, before: State, me: string) {
       return remote.postAlert(a.alert);
     case "resolveAlert":
       return remote.resolveAlert(a.id);
+    case "editPost":
+      return remote.updatePost(a.postId, {
+        ...(a.patch.caption !== undefined ? { caption: a.patch.caption } : {}),
+        ...(a.patch.tags !== undefined ? { tags: a.patch.tags } : {}),
+        ...(a.patch.location !== undefined ? { location: a.patch.location || null } : {}),
+        ...(a.patch.taggedPets !== undefined ? { tagged_pets: a.patch.taggedPets } : {}),
+      });
+    case "commentLike":
+      return remote.commentLike(!before.commentLikes[a.commentId], a.commentId, me);
+    case "react":
+      return remote.react(a.messageId, me, a.emoji);
+    case "postStory":
+      return remote.postStory(a.story);
+    case "deleteStory":
+      return remote.deleteStory(a.id);
+    case "viewStory":
+      return before.seenStories[a.id] ? undefined : remote.viewStory(a.id, me);
+    case "createCollection":
+      return remote.createCollection(me, a.collection);
+    case "renameCollection":
+      return remote.renameCollection(a.id, a.name);
+    case "deleteCollection":
+      return remote.deleteCollection(a.id);
+    case "collectionItem": {
+      if (a.on && !before.saved[a.postId]) await remote.toggle("saves", true, { post_id: a.postId, pet_id: me });
+      return remote.collectionItem(a.on, a.collectionId, a.postId);
+    }
+    case "pawFive":
+      return remote.pawFive(me, a.petId);
+    case "invitePlaydate":
+      return remote.invitePlaydate(a.playdate);
+    case "playdateStatus":
+      return remote.playdateStatus(a.id, a.status);
   }
 }
 
@@ -403,6 +529,14 @@ type Ctx = {
   alerts: LostAlert[];
   level: (petId: string) => ReturnType<typeof levelFor>;
   myPostDays: Set<string>;
+  /** Live stories for a pet (oldest first). */
+  storiesFor: (petId: string) => Story[];
+  storyViewers: (storyId: string) => string[];
+  commentLikeCount: (c: Comment) => number;
+  myPets: Pet[];
+  family: { isOwner: boolean; members: number };
+  pawFivedToday: (petId: string) => boolean;
+  floofOfWeek: Post | undefined;
 };
 
 export type PawPart = { key: string; emoji: string; label: string; count: number; per: number; points: number };
@@ -433,6 +567,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [toastMsg, setToast] = useState<string | null>(null);
   const stateRef = useRef(s);
   stateRef.current = s;
+  const snapRef = useRef<Snapshot | null>(null);
+  snapRef.current = snap;
 
   const toast = useCallback((msg: string) => {
     setToast(msg);
@@ -489,8 +625,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }, [reload]);
 
-  // Live incoming messages.
+  // Live incoming messages and reactions.
   const myPetId = snap?.myPetId ?? null;
+  useEffect(() => {
+    if (!CLOUD || !myPetId) return;
+    return subscribeToReactions((r) => {
+      if (r.pet_id !== myPetId) rawDispatch({ t: "incomingReaction", messageId: r.message_id, petId: r.pet_id, emoji: r.emoji });
+    });
+  }, [myPetId]);
   useEffect(() => {
     if (!CLOUD || !myPetId) return;
     return subscribeToMessages(myPetId, (m) =>
@@ -536,6 +678,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         rawDispatch(a);
         return true;
       }
+      if (a.t === "switchPet") {
+        if (snapRef.current?.userId) pickPet(snapRef.current.userId, a.petId);
+        rawDispatch(a);
+        await reload();
+        return true;
+      }
       if (a.t === "logout") {
         await sb().auth.signOut();
         rawDispatch(a);
@@ -544,6 +692,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (a.t === "createPet") {
         try {
           const newId = await remote.createPet(a.pet);
+          if (snapRef.current?.userId) pickPet(snapRef.current.userId, newId);
           // Starter follows and packs picked during sign-up (best effort).
           await Promise.allSettled([
             ...(a.follow ?? []).map((id) => remote.follow(true, newId, id)),
@@ -601,16 +750,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const meBase = cloudGuest ? GUEST : (pet(meId) ?? (CLOUD ? GUEST : PETS[0]));
     const me: Pet = {
       ...meBase,
-      ...(CLOUD ? {} : s.meEdits),
+      ...(CLOUD || s.customPets.some((p) => p.id === meId) ? {} : s.meEdits),
       biscuitsReceived: meBase.biscuitsReceived + s.received,
       clan: s.clan ?? meBase.clan,
     };
 
     const allPosts = CLOUD ? [...s.myPosts.filter((p) => !snap?.posts.some((x) => x.id === p.id)), ...(snap?.posts ?? [])] : [...s.myPosts, ...POSTS];
-    const posts = allPosts.filter((p) => !s.deleted[p.id]).map((p) => {
-      const extra = s.comments[p.id] ?? [];
-      return extra.length ? { ...p, comments: [...p.comments, ...extra], commentCount: p.commentCount + extra.length } : p;
-    });
+    const posts = allPosts
+      .filter((p) => !s.deleted[p.id])
+      .map((p) => (s.postEdits[p.id] ? { ...p, ...s.postEdits[p.id] } : p))
+      .map((p) => {
+        const extra = (s.comments[p.id] ?? []).filter((c) => !p.comments.some((x) => x.id === c.id));
+        return extra.length ? { ...p, comments: [...p.comments, ...extra], commentCount: p.commentCount + extra.length } : p;
+      });
     const post = (id: string) => posts.find((p) => p.id === id);
 
     const today = dayKey();
@@ -684,6 +836,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return counted - wasMine + isMine;
     };
 
+    const now = Date.now();
+    const allStories = [...(snap?.stories ?? []), ...s.myStories.filter((x) => !snap?.stories.some((y) => y.id === x.id))].filter(
+      (x) => !s.deletedStories[x.id] && x.expiresAt > now,
+    );
+    const storiesFor = (petId: string) => allStories.filter((x) => x.petId === petId).sort((a, b) => a.createdAt - b.createdAt);
+
+    const myPets = CLOUD
+      ? (snap?.myPets ?? []).map((id) => (id === me.id ? me : pet(id))).filter((p): p is Pet => !!p)
+      : [...new Set([...s.localPets, meId])].map((id) => (id === me.id ? me : pet(id))).filter((p): p is Pet => !!p);
+
+    // Floof of the Week: the most-loved post from the last 7 days (falls back to the all-time favourite).
+    const weekAgo = now - 7 * 86_400_000;
+    const score = (p: Post) => p.boops + 5 * p.biscuits + 3 * p.commentCount;
+    const eligible = posts.filter((p) => p.status === undefined || p.status === "approved");
+    const recent = eligible.filter((p) => p.createdAt > weekAgo && pet(p.petId)?.ownerId !== null);
+    const floofOfWeek = [...(recent.length ? recent : eligible)].sort((a, b) => score(b) - score(a))[0];
+
     const baseAlerts = CLOUD ? [...s.alerts.filter((a) => !snap?.alerts.some((x) => x.id === a.id)), ...(snap?.alerts ?? [])] : s.alerts;
     const alerts = baseAlerts.map((a) => (s.resolvedAlerts[a.id] ? { ...a, status: "resolved" as const } : a));
 
@@ -717,6 +886,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       alerts,
       level: (id: string) => levelFor(pawScore(id)),
       myPostDays,
+      storiesFor,
+      storyViewers: (id: string) => snap?.mine?.storyViewers[id] ?? [],
+      commentLikeCount: (c: Comment) => c.likes - (snap?.mine?.commentLikes[c.id] ? 1 : 0) + (s.commentLikes[c.id] ? 1 : 0),
+      myPets,
+      family: snap?.mine?.family ?? { isOwner: true, members: 0 },
+      pawFivedToday: (id: string) => s.pawFivesSent[id] === today,
+      floofOfWeek,
     };
   }, [s, ready, snap, dispatch, reload, toast, toastMsg, loadError]);
 
@@ -730,3 +906,4 @@ export function useStore() {
 }
 
 export const newId = uid;
+export const newUuid = uuid;

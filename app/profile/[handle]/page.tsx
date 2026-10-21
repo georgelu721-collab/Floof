@@ -10,21 +10,28 @@ import type { MomentType } from "@/lib/types";
 import { PetAvatar, PostMedia } from "@/components/PetArt";
 import { BiscuitSheet } from "@/components/BiscuitSheet";
 import { Page, TopBar } from "@/components/Shell";
-import { BiscuitIcon, IconBookmark, IconChevron, IconGrid, IconSettings, IconStar } from "@/components/Icons";
+import { BiscuitIcon, IconBookmark, IconChevron, IconChevronDown, IconGrid, IconSettings, IconStar, IconTag } from "@/components/Icons";
+import { PetSwitcher } from "@/components/PetSwitcher";
+import { PlaydateSheet } from "@/components/PlaydateSheet";
+import { breedSlug } from "@/lib/breeds";
 
 const TABS = [
   { id: "floofs", icon: <IconGrid size={20} /> },
   { id: "moments", icon: <IconStar size={20} /> },
+  { id: "tagged", icon: <IconTag size={20} /> },
   { id: "saved", icon: <IconBookmark size={20} /> },
 ] as const;
 
 export default function Profile() {
   const { handle } = useParams<{ handle: string }>();
   const router = useRouter();
-  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready, cloud, level, streak, alerts } = useStore();
+  const { pets, posts, me, s, dispatch, bestFriends, pawScore, ready, cloud, level, streak, alerts, pawFivedToday, toast } = useStore();
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("floofs");
   const [sheet, setSheet] = useState(false);
-  const pet = pets.find((p) => p.handle === decodeURIComponent(handle));
+  const [switcher, setSwitcher] = useState(false);
+  const [playdate, setPlaydate] = useState(false);
+  const [pawAnim, setPawAnim] = useState(false);
+  const pet = me.handle === decodeURIComponent(handle) ? me : pets.find((p) => p.handle === decodeURIComponent(handle));
 
   if (!pet) {
     return (
@@ -42,7 +49,14 @@ export default function Profile() {
   const friends = bestFriends(pet.id);
   const bf = friends[0];
   const followers = pet.followers + (following && !isMe ? 1 : 0);
-  const shown = tab === "floofs" ? theirPosts : tab === "moments" ? moments : posts.filter((p) => s.saved[p.id]);
+  const shown =
+    tab === "floofs"
+      ? theirPosts
+      : tab === "moments"
+        ? moments
+        : tab === "tagged"
+          ? posts.filter((p) => p.taggedPets?.includes(pet.id))
+          : posts.filter((p) => s.saved[p.id]);
   const badges = badgesFor({
     posts: theirPosts.length,
     boops: theirPosts.reduce((a, p) => a + p.boops, 0),
@@ -63,10 +77,17 @@ export default function Profile() {
     <Page>
       <TopBar
         title={
-          <span className="flex items-center gap-1">
-            {pet.handle}
-            {pet.verified && <span className="text-sm text-sky">●</span>}
-          </span>
+          isMe ? (
+            <button className="flex items-center gap-1" onClick={() => setSwitcher(true)} aria-label="Switch pet">
+              {pet.handle}
+              <IconChevronDown size={18} />
+            </button>
+          ) : (
+            <span className="flex items-center gap-1">
+              {pet.handle}
+              {pet.verified && <span className="text-sm text-sky">●</span>}
+            </span>
+          )
         }
         back={!isMe}
         right={
@@ -100,8 +121,18 @@ export default function Profile() {
           </Link>
         </h2>
         <p className="text-sm font-semibold text-muted">
-          {pet.breed} · {pet.age} · {pet.city}
+          {pet.breed ? (
+            <Link href={`/breeds/${breedSlug(pet.breed)}`} className="underline decoration-oat underline-offset-2">
+              {pet.breed}
+            </Link>
+          ) : null}
+          {[pet.age, pet.city].filter(Boolean).map((x) => ` · ${x}`)}
         </p>
+        {(pet.personality || isMe) && (
+          <Link href={isMe ? "/quiz" : `/quiz?pet=${pet.handle}`} className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#EFE8FB] px-2.5 py-1 text-xs font-extrabold">
+            {pet.personality ? `✨ ${pet.personality}` : "✨ Take the personality quiz"}
+          </Link>
+        )}
         {pet.bio.map((b) => (
           <p key={b} className="text-[15px]">
             {b}
@@ -138,7 +169,7 @@ export default function Profile() {
             <Link href="/settings/profile" className="btn btn-soft w-full !py-2.5">
               Edit profile
             </Link>
-            <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-extrabold">
+            <div className="grid grid-cols-5 gap-1.5 text-center text-[11px] font-extrabold">
               <Link href="/wallet" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
                 <BiscuitIcon size={20} /> {pet.biscuitsReceived}
               </Link>
@@ -150,6 +181,9 @@ export default function Profile() {
               </Link>
               <Link href="/recap" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
                 <span className="text-lg leading-5">📊</span> Recap
+              </Link>
+              <Link href="/playdates" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <span className="text-lg leading-5">🎾</span> Playdates
               </Link>
             </div>
           </div>
@@ -163,6 +197,22 @@ export default function Profile() {
             </Link>
             <button className="btn btn-soft !px-3.5 !py-2.5" onClick={() => setSheet(true)} aria-label={`Send ${pet.name} a biscuit`}>
               <BiscuitIcon size={20} />
+            </button>
+            <button
+              className={`btn col-span-2 !py-2.5 text-sm ${pawFivedToday(pet.id) ? "btn-soft opacity-70" : "btn-soft"}`}
+              disabled={pawFivedToday(pet.id)}
+              onClick={async () => {
+                if (await dispatch({ t: "pawFive", petId: pet.id })) {
+                  setPawAnim(true);
+                  setTimeout(() => setPawAnim(false), 1200);
+                  toast(`Paw-five sent to ${pet.name}! 🐾`);
+                }
+              }}
+            >
+              {pawFivedToday(pet.id) ? "🐾 Paw-fived today" : "🐾 Paw-five"}
+            </button>
+            <button className="btn btn-soft !px-3.5 !py-2.5" onClick={() => setPlaydate(true)} aria-label={`Invite ${pet.name} to a playdate`}>
+              🎾
             </button>
           </div>
         )}
@@ -210,6 +260,25 @@ export default function Profile() {
           </button>
         ))}
       </div>
+      {tab === "saved" && isMe && (
+        <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 py-3">
+          {s.collections.map((c) => {
+            const cover = posts.find((x) => x.id === c.postIds[c.postIds.length - 1]);
+            return (
+              <Link key={c.id} href={`/collections/${c.id}`} className="w-24 shrink-0">
+                {cover && pets.find((x) => x.id === cover.petId) ? (
+                  <PostMedia post={cover} pet={pets.find((x) => x.id === cover.petId)!} className="aspect-square rounded-2xl" />
+                ) : (
+                  <div className="flex aspect-square items-center justify-center rounded-2xl bg-sand text-2xl">🔖</div>
+                )}
+                <p className="mt-1 truncate text-xs font-extrabold">{c.name}</p>
+                <p className="text-[11px] font-semibold text-muted">{c.postIds.length}</p>
+              </Link>
+            );
+          })}
+          {s.collections.length === 0 && <p className="text-xs font-semibold text-muted">Tip: when you save a floof you can add it to a collection.</p>}
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-0.5">
         {shown.map((p) => (
           <Link key={p.id} href={`/post/${p.id}`} className="relative">
@@ -220,10 +289,13 @@ export default function Profile() {
       </div>
       {shown.length === 0 && (
         <p className="px-8 py-12 text-center font-semibold text-muted">
-          {tab === "saved" ? "Nothing saved yet" : isMe ? "Post your first floof! 🐾" : "No floofs yet"}
+          {tab === "saved" ? "Nothing saved yet" : tab === "tagged" ? `No floofs tagging ${pet.name} yet` : isMe ? "Post your first floof! 🐾" : "No floofs yet"}
         </p>
       )}
       {sheet && <BiscuitSheet pet={pet} onClose={() => setSheet(false)} />}
+      {switcher && <PetSwitcher onClose={() => setSwitcher(false)} />}
+      {pawAnim && <div className="animate-float-up pointer-events-none fixed left-1/2 top-1/2 z-50 -ml-8 text-6xl">🐾</div>}
+      {playdate && <PlaydateSheet pet={pet} onClose={() => setPlaydate(false)} />}
     </Page>
   );
 }

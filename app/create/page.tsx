@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { MOMENT_TYPES } from "@/lib/data";
 import { addDays, dayKey, promptFor } from "@/lib/daily";
 import { fileToDataUrl } from "@/lib/image";
 import { newId, useStore } from "@/lib/store";
-import type { Accessory, Expression, MomentType, Scene } from "@/lib/types";
-import { PostMedia } from "@/components/PetArt";
+import type { Accessory, Expression, MomentType, Scene, Sticker } from "@/lib/types";
+import { Decorations, FRAMES, PetAvatar, PostMedia, STICKERS } from "@/components/PetArt";
+import { TagPicker } from "@/components/TagPicker";
 import { TopBar } from "@/components/Shell";
 import { IconImage, IconPin, PawIcon } from "@/components/Icons";
 
@@ -47,7 +48,7 @@ const EXPRESSIONS: { id: Expression; label: string }[] = [
 function CreateInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { me, dispatch, toast, s, signedIn, ready, cloud } = useStore();
+  const { me, dispatch, toast, s, signedIn, ready, cloud, pet: petOf } = useStore();
   const initialMoment = params.get("moment") as MomentType | null;
   const validMoment = initialMoment && initialMoment in MOMENT_TYPES ? initialMoment : null;
   // Answering the Daily Floof prompt (?daily=YYYY-MM-DD, only today or yesterday).
@@ -67,6 +68,20 @@ function CreateInner() {
   const [location, setLocation] = useState(me.city ? `${me.city}, Australia` : "");
   const [moment, setMoment] = useState<MomentType | "">(validMoment ?? "");
   const [busy, setBusy] = useState(false);
+  const [tagged, setTagged] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [frame, setFrame] = useState("");
+  const [stickers, setStickers] = useState<Sticker[]>([]);
+  const dragging = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const moveSticker = (e: React.PointerEvent) => {
+    if (dragging.current === null || !previewRef.current) return;
+    const r = previewRef.current.getBoundingClientRect();
+    const x = Math.min(95, Math.max(5, ((e.clientX - r.left) / r.width) * 100));
+    const y = Math.min(95, Math.max(5, ((e.clientY - r.top) / r.height) * 100));
+    const i = dragging.current;
+    setStickers((st) => st.map((s, j) => (j === i ? { ...s, x: Math.round(x), y: Math.round(y) } : s)));
+  };
 
   const post = () => {
     const id = `my_${newId()}`;
@@ -94,6 +109,9 @@ function CreateInner() {
         createdAt: Date.now(),
         moment: moment || undefined,
         dailyDate,
+        taggedPets: tagged.length ? tagged : undefined,
+        frame: frame || undefined,
+        stickers: stickers.length ? stickers : undefined,
       },
     });
     toast(
@@ -136,12 +154,30 @@ function CreateInner() {
             </div>
           </div>
         )}
+        <div
+          ref={previewRef}
+          className="relative"
+          onPointerMove={moveSticker}
+          onPointerUp={() => (dragging.current = null)}
+          onPointerLeave={() => (dragging.current = null)}
+        >
         <PostMedia
-          post={{ scene, accessory, expression, image, images: photos, overlay }}
+          post={{ scene, accessory, expression, image, images: photos, overlay, frame }}
           pet={me}
           carousel
           className="aspect-square rounded-[1.6rem]"
         />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.6rem]" style={{ containerType: "inline-size" }}>
+            <Decorations
+              stickers={stickers}
+              onStickerPointerDown={(i, e) => {
+                dragging.current = i;
+                e.preventDefault();
+              }}
+            />
+          </div>
+        </div>
+        {stickers.length > 0 && <p className="mt-1 text-center text-xs font-semibold text-muted">Drag stickers to move them</p>}
 
         {photos.length > 0 && (
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
@@ -196,6 +232,41 @@ function CreateInner() {
         )}
 
         <div className="mt-5 space-y-3">
+          <p className="text-sm font-extrabold">Frame</p>
+          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            {FRAMES.map((f) => (
+              <button key={f.id} className="chip" data-on={frame === f.id} onClick={() => setFrame(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm font-extrabold">Stickers {stickers.length > 0 && <span className="font-semibold text-muted">· {stickers.length}/6</span>}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {STICKERS.map((e) => (
+              <button
+                key={e}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-sand text-xl disabled:opacity-40"
+                disabled={stickers.length >= 6}
+                onClick={() => setStickers((st) => [...st, { e, x: 30 + ((st.length * 17) % 45), y: 25 + ((st.length * 23) % 50) }])}
+                aria-label={`Add ${e} sticker`}
+              >
+                {e}
+              </button>
+            ))}
+            {stickers.length > 0 && (
+              <button className="rounded-xl bg-sand px-3 text-xs font-extrabold" onClick={() => setStickers((st) => st.slice(0, -1))}>
+                Undo
+              </button>
+            )}
+          </div>
+          <button className="card flex w-full items-center gap-3 px-4 py-3 text-left" onClick={() => setPicking(true)}>
+            <span className="text-xl">🏷️</span>
+            <span className="flex-1 font-bold">Tag pets</span>
+            <span className="flex -space-x-2">
+              {tagged.slice(0, 4).map((t) => (petOf(t) ? <PetAvatar key={t} pet={petOf(t)!} size={26} /> : null))}
+            </span>
+            <span className="text-sm font-bold text-muted">{tagged.length || "None"}</span>
+          </button>
           <input className="input" placeholder="Handwritten sticker text (e.g. zoomies!)" maxLength={28} value={overlay} onChange={(e) => setOverlay(e.target.value)} />
           <textarea
             className="input min-h-24 !rounded-3xl"
@@ -235,6 +306,7 @@ function CreateInner() {
           </div>
         </div>
 
+        {picking && <TagPicker value={tagged} onChange={setTagged} onClose={() => setPicking(false)} />}
         <button className="btn btn-pink mt-6 w-full text-lg" onClick={post} disabled={busy}>
           <PawIcon size={20} /> Post Floof
         </button>

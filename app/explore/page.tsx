@@ -61,17 +61,20 @@ function ExploreInner() {
         ))}
       </div>
 
+      {!query && <FloofOfWeek />}
       {!query && (
-        <div className="grid grid-cols-3 gap-2 px-4 py-3">
+        <div className="grid grid-cols-4 gap-2 px-4 py-3">
           {[
             { href: "/daily", emoji: "📅", label: "Daily Floof" },
+            { href: "/breeds", emoji: "🐕", label: "Breed clubs" },
+            { href: "/playdates", emoji: "🎾", label: "Playdates" },
             { href: "/lost", emoji: "🚨", label: "Lost & Found" },
             { href: "/care", emoji: "🩺", label: "Pet care" },
-            { href: "/marketplace", emoji: "🛍️", label: "Marketplace" },
+            { href: "/quiz", emoji: "✨", label: "Personality" },
             { href: "/meetups", emoji: "📍", label: "Meetups" },
-            { href: "/friends", emoji: "💛", label: "Best Friends" },
+            { href: "/marketplace", emoji: "🛍️", label: "Market" },
           ].map((t) => (
-            <Link key={t.href} href={t.href} className="card flex flex-col items-center gap-1 p-3 text-center text-xs font-extrabold">
+            <Link key={t.href} href={t.href} className="card flex flex-col items-center gap-1 px-1 py-3 text-center text-[11px] font-extrabold">
               <span className="text-xl">{t.emoji}</span> {t.label}
             </Link>
           ))}
@@ -145,5 +148,23 @@ export default function Explore() {
     <Suspense>
       <ExploreInner />
     </Suspense>
+  );
+}
+
+function FloofOfWeek() {
+  const { floofOfWeek: p, pet } = useStore();
+  const owner = p ? pet(p.petId) : undefined;
+  if (!p || !owner) return null;
+  return (
+    <Link href={`/post/${p.id}`} className="card mx-4 mt-3 flex items-center gap-3 overflow-hidden bg-gradient-to-r from-[#FFF4CC] to-[#FFE3CF] p-3">
+      <PostMedia post={p} pet={owner} className="h-20 w-20 shrink-0 rounded-2xl" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-extrabold uppercase tracking-wider text-cocoa-soft">🏆 Floof of the Week</p>
+        <p className="flex items-center gap-1.5 truncate font-display text-lg font-semibold">
+          <PetAvatar pet={owner} size={22} /> {owner.name}
+        </p>
+        <p className="truncate text-xs font-semibold text-cocoa-soft">{p.caption}</p>
+      </div>
+    </Link>
   );
 }
