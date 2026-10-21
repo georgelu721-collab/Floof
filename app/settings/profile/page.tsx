@@ -63,8 +63,9 @@ export default function EditProfile() {
         breed: breed.trim(),
         age: age.trim(),
         city: city.trim(),
-        birthday: birthday || undefined,
-        gotchaDay: gotcha || undefined,
+        // Only send dates that changed.
+        ...(birthday !== (me.birthday ?? "") ? { birthday: birthday || undefined } : {}),
+        ...(gotcha !== (me.gotchaDay ?? "") ? { gotchaDay: gotcha || undefined } : {}),
         ...(photo !== me.photo ? { photo } : {}),
       },
     });

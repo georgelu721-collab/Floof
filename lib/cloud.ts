@@ -511,7 +511,16 @@ export const remote = {
     id: string,
     patch: Partial<{ clan: Clan; meetups_opt_in: boolean; name: string; bio: string[]; photo_url: string | null; breed: string; age: string; city: string; birthday: string | null; gotcha_day: string | null }>,
   ) {
-    check(await sb().from("pets").update(patch).eq("id", id));
+    const res = await sb().from("pets").update(patch).eq("id", id);
+    // If the database hasn't been updated with the birthday columns yet, save everything else.
+    if (res.error && /birthday|gotcha_day/.test(res.error.message) && ("birthday" in patch || "gotcha_day" in patch)) {
+      const rest = { ...patch };
+      delete rest.birthday;
+      delete rest.gotcha_day;
+      check(await sb().from("pets").update(rest).eq("id", id));
+      throw new Error("Saved, except birthday/Gotcha Day: re-run supabase/setup.sql in Supabase to enable them");
+    }
+    check(res);
   },
   async toggle(table: "boops" | "saves", on: boolean, row: { post_id: string; pet_id: string }) {
     const q = sb().from(table);

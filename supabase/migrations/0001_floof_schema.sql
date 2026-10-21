@@ -690,3 +690,6 @@ end;
 $$;
 drop trigger if exists posts_welcome_first on public.posts;
 create trigger posts_welcome_first after insert on public.posts for each row execute function public.welcome_first_post();
+
+-- Make the Data API pick up new columns and tables straight away.
+notify pgrst, 'reload schema';
