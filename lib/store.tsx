@@ -269,6 +269,7 @@ type Ctx = {
   post: (id: string) => Post | undefined;
   bestFriends: (petId: string) => { pet: Pet; score: number; streak: number }[];
   pawScore: (petId: string) => number;
+  pawBreakdown: (petId: string) => PawPart[];
   clanExtra: { cats: number; dogs: number };
   extraVotes: (compId: string, postId: string) => number;
   remoteEntries: (compId: string) => string[];
@@ -276,6 +277,8 @@ type Ctx = {
   toastMsg: string | null;
   loadError: string | null;
 };
+
+export type PawPart = { key: string; emoji: string; label: string; count: number; per: number; points: number };
 
 const StoreCtx = createContext<Ctx | null>(null);
 
@@ -474,22 +477,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         .sort((a, b) => b.score - a.score);
     };
 
-    const pawScore = (petId: string) => {
+    /** How a PawScore is made up. Full detail is only known for my own pet. */
+    const pawBreakdown = (petId: string): PawPart[] => {
       const p = petId === me.id ? me : pet(petId);
-      if (!p) return 0;
-      if (petId !== meId) return p.pawScore + (p.ownerId ? (p.postCount ?? 0) * 25 : 0);
+      if (!p) return [];
+      const base: PawPart = { key: "base", emoji: "🐾", label: p.pawScore > 100 ? "Floof legacy score" : "Welcome bonus", count: 1, per: p.pawScore, points: p.pawScore };
+      if (petId !== meId) {
+        const posted = p.ownerId ? (p.postCount ?? 0) : 0;
+        return posted ? [base, { key: "posts", emoji: "📸", label: "Floofs posted", count: posted, per: 25, points: posted * 25 }] : [base];
+      }
       const sent = s.ledger.filter((l) => l.type === "sent").reduce((a, l) => a + l.amount, 0);
-      const myPostCount = posts.filter((x) => x.petId === meId && x.createdAt).length;
-      return (
-        p.pawScore +
-        myPostCount * 25 +
-        Object.keys(s.boops).length * 2 +
-        Object.values(s.comments).flat().length * 4 +
-        sent * 3 +
-        Object.keys(s.checkins).length * 50 +
-        Object.keys(s.events).length * 10
-      );
+      const parts: Omit<PawPart, "points">[] = [
+        { key: "posts", emoji: "📸", label: "Floofs posted", count: posts.filter((x) => x.petId === meId && x.createdAt).length, per: 25 },
+        { key: "boops", emoji: "❤️", label: "Boops given", count: Object.keys(s.boops).length, per: 2 },
+        { key: "comments", emoji: "💬", label: "Kind comments", count: posts.reduce((a, x) => a + x.comments.filter((c) => c.petId === meId).length, 0), per: 4 },
+        { key: "biscuits", emoji: "🍪", label: "Biscuits sent", count: sent, per: 3 },
+        { key: "checkins", emoji: "📍", label: "Event check-ins", count: Object.keys(s.checkins).length, per: 50 },
+        { key: "events", emoji: "🎟️", label: "Events joined", count: Object.keys(s.events).length, per: 10 },
+      ];
+      return [base, ...parts.map((x) => ({ ...x, points: x.count * x.per }))];
     };
+    const pawScore = (petId: string) => pawBreakdown(petId).reduce((a, x) => a + x.points, 0);
 
     const clanExtra = CLOUD && snap
       ? {
@@ -517,6 +525,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       post,
       bestFriends,
       pawScore,
+      pawBreakdown,
       clanExtra,
       extraVotes,
       remoteEntries,

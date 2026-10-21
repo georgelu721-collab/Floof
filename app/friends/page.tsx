@@ -42,13 +42,11 @@ export default function Friends() {
             {top.pet.name} · {top.streak > 0 ? `${top.streak} day streak 🔥` : "new friend"}
           </p>
         )}
-        <div className="mt-4 rounded-2xl bg-paper/80 p-3">
+        <Link href={`/pawscore/${me.handle}`} className="mt-4 block rounded-2xl bg-paper/80 p-3">
           <p className="text-xs font-extrabold uppercase tracking-wider text-muted">Your pet&apos;s social score</p>
           <p className="font-display text-4xl font-bold">{pawScore(me.id).toLocaleString()}</p>
-          <p className="text-xs font-bold text-sage">
-            {pawScore(me.id) >= 8000 ? "▲ Top 5% of all pets" : pawScore(me.id) >= 4000 ? "▲ Top 20% of all pets" : "🌱 Rising star — keep floofing!"}
-          </p>
-        </div>
+          <p className="text-xs font-bold text-blush">See how it&apos;s calculated →</p>
+        </Link>
       </section>
 
       <SectionTitle>Close friends</SectionTitle>

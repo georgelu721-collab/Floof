@@ -10,7 +10,7 @@ import type { MomentType } from "@/lib/types";
 import { PetAvatar, PostMedia } from "@/components/PetArt";
 import { BiscuitSheet } from "@/components/BiscuitSheet";
 import { Page, TopBar } from "@/components/Shell";
-import { BiscuitIcon, IconBookmark, IconGrid, IconSettings, IconStar } from "@/components/Icons";
+import { BiscuitIcon, IconBookmark, IconChevron, IconGrid, IconSettings, IconStar } from "@/components/Icons";
 
 const TABS = [
   { id: "floofs", icon: <IconGrid size={20} /> },
@@ -156,16 +156,22 @@ export default function Profile() {
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-between rounded-2xl bg-paper px-4 py-3 shadow-sm">
+        <Link
+          href={`/pawscore/${pet.handle}`}
+          className="mt-4 flex items-center justify-between rounded-2xl bg-paper px-4 py-3 shadow-sm transition active:scale-[.99]"
+        >
           <div>
             <p className="text-xs font-extrabold uppercase tracking-wide text-muted">PawScore</p>
             <p className="font-display text-2xl font-semibold">{pawScore(pet.id).toLocaleString()}</p>
           </div>
-          <div className="text-right text-xs font-bold text-muted">
-            <p>{compact(pet.biscuitsReceived)} biscuits received</p>
-            <p>{friends.length} close friends</p>
+          <div className="flex items-center gap-2 text-right text-xs font-bold text-muted">
+            <div>
+              <p>{compact(pet.biscuitsReceived)} biscuits received</p>
+              <p>{friends.length} close friends</p>
+            </div>
+            <IconChevron size={18} />
           </div>
-        </div>
+        </Link>
       </section>
 
       {badges.length > 0 && (
