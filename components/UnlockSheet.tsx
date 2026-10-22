@@ -8,18 +8,20 @@ import { BiscuitIcon } from "./Icons";
 import { FilteredSample, FramePreview } from "./ShopPreviews";
 import { Sheet } from "./Sheet";
 
-/** Confirm buying a Biscuit Shop item with wallet biscuits. */
+/** Confirm buying a Biscuit Shop item with wallet biscuits or biscuits fans sent. */
 export function UnlockSheet({ itemId, onClose, onUnlocked }: { itemId: string; onClose: () => void; onUnlocked?: () => void }) {
-  const { s, dispatch, toast, signedIn } = useStore();
+  const { s, me, dispatch, toast, signedIn } = useStore();
   const [busy, setBusy] = useState(false);
   const item = shopItem(itemId);
   if (!item) return null;
   const owned = !!s.unlocks[item.id];
-  const short = item.price > s.balance;
+  const earned = Math.max(0, me.biscuitsReceived);
+  const canWallet = item.price <= s.balance;
+  const canEarned = item.price <= earned;
 
-  const buy = async () => {
+  const buy = async (from: "wallet" | "earnings") => {
     setBusy(true);
-    const ok = await dispatch({ t: "unlock", item: item.id });
+    const ok = await dispatch({ t: "unlock", item: item.id, from });
     setBusy(false);
     if (ok) {
       toast(`${item.emoji} ${item.name} unlocked!`);
@@ -41,7 +43,9 @@ export function UnlockSheet({ itemId, onClose, onUnlocked }: { itemId: string; o
         <p className="mt-3 flex items-center gap-1.5 font-display text-2xl font-semibold">
           <BiscuitIcon size={26} /> {item.price}
         </p>
-        <p className="text-xs font-bold text-muted">You have {s.balance} biscuits</p>
+        <p className="text-xs font-bold text-muted">
+          Wallet {s.balance} · Earned from fans {earned}
+        </p>
       </div>
       <div className="mt-4 space-y-2">
         {owned ? (
@@ -52,14 +56,23 @@ export function UnlockSheet({ itemId, onClose, onUnlocked }: { itemId: string; o
           <Link href="/login" className="btn btn-dark w-full">
             Log in to unlock
           </Link>
-        ) : short ? (
+        ) : !canWallet && !canEarned ? (
           <Link href="/wallet" className="btn btn-dark w-full">
-            Top up biscuits ({item.price - s.balance} more needed)
+            Top up biscuits ({item.price - Math.max(s.balance, earned)} more needed)
           </Link>
         ) : (
-          <button className="btn btn-pink w-full" disabled={busy} onClick={buy}>
-            {busy ? "Unlocking…" : `Unlock for ${item.price} biscuits`}
-          </button>
+          <>
+            {canWallet && (
+              <button className="btn btn-pink w-full" disabled={busy} onClick={() => void buy("wallet")}>
+                {busy ? "Unlocking…" : `Unlock with wallet · ${item.price} biscuits`}
+              </button>
+            )}
+            {canEarned && (
+              <button className={`btn w-full ${canWallet ? "btn-soft" : "btn-pink"}`} disabled={busy} onClick={() => void buy("earnings")}>
+                {busy ? "Unlocking…" : `Unlock with earned biscuits · ${item.price}`}
+              </button>
+            )}
+          </>
         )}
       </div>
     </Sheet>

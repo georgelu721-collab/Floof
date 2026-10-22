@@ -15,7 +15,7 @@ const SECTIONS: { kind: ShopKind; title: string; blurb: string }[] = [
 ];
 
 export default function Shop() {
-  const { s } = useStore();
+  const { s, me } = useStore();
   const [buying, setBuying] = useState<string | null>(null);
   const owned = SHOP.filter((i) => s.unlocks[i.id]).length;
 
@@ -25,8 +25,13 @@ export default function Shop() {
       <section className="card mx-4 flex items-center gap-4 bg-gradient-to-br from-[#FFE6CC] to-[#FDE4E8] p-4">
         <BiscuitIcon size={44} />
         <div className="flex-1 leading-tight">
-          <p className="font-display text-3xl font-bold">{s.balance}</p>
-          <p className="text-sm font-bold text-cocoa-soft">biscuits to spend · {owned} unlocked</p>
+          <p className="font-display text-3xl font-bold">{s.balance + Math.max(0, me.biscuitsReceived)}</p>
+          <p className="text-sm font-bold text-cocoa-soft">
+            biscuits to spend · {owned} unlocked
+          </p>
+          <p className="text-[11px] font-bold text-muted">
+            Wallet {s.balance} · Earned from fans {Math.max(0, me.biscuitsReceived)}
+          </p>
         </div>
         <Link href="/wallet" className="btn btn-dark !px-4 !py-2 text-sm">
           Top up

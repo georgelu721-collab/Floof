@@ -142,7 +142,7 @@ export type Action =
   | { t: "invitePlaydate"; playdate: Playdate }
   | { t: "playdateStatus"; id: string; status: Playdate["status"] }
   | { t: "switchPet"; petId: string }
-  | { t: "unlock"; item: string }
+  | { t: "unlock"; item: string; from: "wallet" | "earnings" }
   | { t: "saveNote"; note: Note }
   | { t: "deleteNote"; id: string };
 
@@ -263,12 +263,21 @@ function reducer(s: State, a: Action): State {
       };
     case "unlock": {
       const price = shopItem(a.item)?.price;
-      if (!price || s.unlocks[a.item] || price > s.balance) return s;
+      if (!price || s.unlocks[a.item]) return s;
+      const note = `Biscuit Shop: ${shopItem(a.item)!.name}`;
+      if (a.from === "earnings")
+        return {
+          ...s,
+          received: s.received - price,
+          unlocks: { ...s.unlocks, [a.item]: true },
+          ledger: [{ id: uid(), type: "redeem", amount: price, note, at: Date.now() }, ...s.ledger],
+        };
+      if (price > s.balance) return s;
       return {
         ...s,
         balance: s.balance - price,
         unlocks: { ...s.unlocks, [a.item]: true },
-        ledger: [{ id: uid(), type: "shop", amount: price, note: `Biscuit Shop: ${shopItem(a.item)!.name}`, at: Date.now() }, ...s.ledger],
+        ledger: [{ id: uid(), type: "shop", amount: price, note, at: Date.now() }, ...s.ledger],
       };
     }
     case "saveNote":
@@ -497,7 +506,7 @@ async function syncAction(a: Action, before: State, me: string) {
     case "playdateStatus":
       return remote.playdateStatus(a.id, a.status);
     case "unlock":
-      return before.unlocks[a.item] ? undefined : remote.unlock(me, a.item);
+      return before.unlocks[a.item] ? undefined : remote.unlock(me, a.item, a.from);
     case "saveNote":
       return remote.saveNote(me, a.note);
     case "deleteNote":
@@ -742,7 +751,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (a.t === "sendBiscuits" && a.amount > stateRef.current.balance) return false;
-      if (a.t === "unlock" && (shopItem(a.item)?.price ?? Infinity) > stateRef.current.balance) return false;
+      if (a.t === "unlock" && a.from === "wallet" && (shopItem(a.item)?.price ?? Infinity) > stateRef.current.balance) return false;
       const hasPhotos = a.t === "post" && !!(a.post.image || a.post.images?.length);
       if (a.t === "post" && hasPhotos) a = { ...a, post: { ...a.post, status: "pending" } };
       const before = stateRef.current;
@@ -750,7 +759,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (LOGIN_FREE.has(a.t) || a.t === "clanFloof") return true;
       try {
         await syncAction(a, before, me!);
-        if (a.t === "updateMe" || a.t === "postAlert") void reload();
+        if (a.t === "updateMe" || a.t === "postAlert" || (a.t === "unlock" && a.from === "earnings")) void reload();
         if (a.t === "post" && hasPhotos) {
           // Check the photos for a pet, then refresh so the post shows its result.
           void moderatePost(a.post.id).then((r) => {

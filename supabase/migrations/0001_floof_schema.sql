@@ -1056,8 +1056,10 @@ drop policy if exists floof_unlocks_read on public.shop_unlocks;
 create policy floof_unlocks_read on public.shop_unlocks for select to authenticated using (public.owns_pet(pet_id));
 grant select on public.shop_unlocks to authenticated;
 
--- Buy an item with wallet biscuits. Buying something you already own costs nothing.
-create or replace function public.buy_shop_item(p_pet text, p_item text)
+-- Buy an item with wallet biscuits (p_from = 'wallet') or with biscuits fans sent (p_from = 'earnings').
+-- Buying something you already own costs nothing. Returns what's left in the chosen balance.
+drop function if exists public.buy_shop_item(text, text);
+create or replace function public.buy_shop_item(p_pet text, p_item text, p_from text default 'wallet')
 returns int
 language plpgsql
 security definer
@@ -1069,19 +1071,32 @@ declare
 begin
   if not public.owns_pet(p_pet) then raise exception 'not your pet'; end if;
   if price is null then raise exception 'unknown item'; end if;
+  if p_from not in ('wallet', 'earnings') then raise exception 'pay from wallet or earnings'; end if;
+  -- the same locks send_biscuits and redeem_biscuits use, so balances can't go negative
   perform pg_advisory_xact_lock(hashtext('wallet:' || p_pet));
+  perform pg_advisory_xact_lock(hashtext('earnings:' || p_pet));
   if exists (select 1 from public.shop_unlocks where pet_id = p_pet and item = p_item) then
-    return public.wallet_balance(p_pet);
+    return 0;
   end if;
-  bal := public.wallet_balance(p_pet);
-  if bal < price then raise exception 'not enough biscuits'; end if;
-  insert into public.biscuit_ledger (pet_id, kind, amount, note) values (p_pet, 'shop', price, 'Biscuit Shop: ' || p_item);
+  if p_from = 'wallet' then
+    bal := public.wallet_balance(p_pet);
+    if bal < price then raise exception 'not enough biscuits'; end if;
+    insert into public.biscuit_ledger (pet_id, kind, amount, note) values (p_pet, 'shop', price, 'Biscuit Shop: ' || p_item);
+  else
+    select p.biscuits_base + coalesce(sum(case when l.kind = 'received' then l.amount
+                                               when l.kind = 'redeem' then -l.amount else 0 end), 0)
+      into bal
+    from public.pets p left join public.biscuit_ledger l on l.pet_id = p.id
+    where p.id = p_pet group by p.biscuits_base;
+    if bal < price then raise exception 'not enough earned biscuits'; end if;
+    insert into public.biscuit_ledger (pet_id, kind, amount, note) values (p_pet, 'redeem', price, 'Biscuit Shop: ' || p_item);
+  end if;
   insert into public.shop_unlocks (pet_id, item) values (p_pet, p_item);
   return bal - price;
 end;
 $$;
-revoke all on function public.buy_shop_item(text, text) from public, anon;
-grant execute on function public.buy_shop_item(text, text) to authenticated;
+revoke all on function public.buy_shop_item(text, text, text) from public, anon;
+grant execute on function public.buy_shop_item(text, text, text) to authenticated;
 
 -- Premium frames and stickers can only be used by pets that unlocked them.
 create or replace function public.check_post_unlocks()

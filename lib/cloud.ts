@@ -4,6 +4,7 @@ import { sb } from "./supabase";
 import { timeAgo } from "./data";
 import { addDays, dayKey } from "./daily";
 import { makeThumb } from "./photo";
+import { shopItem } from "./shop";
 import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Note, Notification, Pet, Playdate, Post, Reminder, Sticker, Story, Thread, Weight } from "./types";
 
 /* ---------------- Row → app model mapping ---------------- */
@@ -375,7 +376,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
         amount: l.amount,
         petId: l.counterparty_id ?? undefined,
         postId: l.post_id ?? undefined,
-        note: l.note ?? undefined,
+        note: l.note?.startsWith("Biscuit Shop: ") ? `Biscuit Shop: ${shopItem(l.note.slice(14))?.name ?? l.note.slice(14)}` : (l.note ?? undefined),
         at: Date.parse(l.created_at),
       });
     }
@@ -627,8 +628,8 @@ export const remote = {
   async deleteReminder(id: string) {
     check(await sb().from("reminders").delete().eq("id", id));
   },
-  async unlock(pet: string, item: string) {
-    check(await sb().rpc("buy_shop_item", { p_pet: pet, p_item: item }));
+  async unlock(pet: string, item: string, from: "wallet" | "earnings") {
+    check(await sb().rpc("buy_shop_item", { p_pet: pet, p_item: item, p_from: from }));
   },
   async saveNote(pet: string, n: Note) {
     check(await sb().from("pet_notes").upsert({ id: n.id, pet_id: pet, title: n.title, body: n.body, pinned: n.pinned }));
