@@ -3,13 +3,17 @@
 import Link from "next/link";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { MOMENT_TYPES } from "@/lib/data";
 import { addDays, dayKey, promptFor } from "@/lib/daily";
 import { fileToDataUrl } from "@/lib/image";
 import { newId, useStore } from "@/lib/store";
 import type { Accessory, Expression, MomentType, Scene, Sticker } from "@/lib/types";
-import { Decorations, FRAMES, PetAvatar, PostMedia, STICKERS } from "@/components/PetArt";
+import { ALL_FRAMES, Decorations, PetAvatar, PostMedia, STICKERS } from "@/components/PetArt";
+import { type EditablePhoto, PhotoEditor } from "@/components/PhotoEditor";
+import { UnlockSheet } from "@/components/UnlockSheet";
+import { type Aspect, NO_EDIT, renderPhoto } from "@/lib/photo";
+import { SHOP } from "@/lib/shop";
 import { TagPicker } from "@/components/TagPicker";
 import { TopBar } from "@/components/Shell";
 import { IconImage, IconPin, PawIcon } from "@/components/Icons";
@@ -58,8 +62,24 @@ function CreateInner() {
   const dailyDate = dailyParam && (dailyParam === dayKey() || dailyParam === addDays(dayKey(), -1)) ? dailyParam : undefined;
   const dailyPrompt = dailyDate ? promptFor(dailyDate) : null;
 
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [raw, setRaw] = useState<(EditablePhoto & { out?: string })[]>([]);
+  const photos = raw.map((p) => p.out ?? p.src);
   const image = photos[0];
+  const [aspect, setAspect] = useState<Aspect>("square");
+  const [editing, setEditing] = useState<number | null>(null);
+  const [buying, setBuying] = useState<{ item: string; then?: () => void } | null>(null);
+  const owns = (item?: string) => !item || !!s.unlocks[item];
+  // Re-draw edited photos when the post's shape changes.
+  useEffect(() => {
+    let live = true;
+    void Promise.all(raw.map((p) => (p.out ? renderPhoto(p.src, aspect, p.edit) : Promise.resolve(undefined)))).then((outs) => {
+      if (live) setRaw((rs) => rs.map((r, i) => (r.out && outs[i] ? { ...r, out: outs[i] } : r)));
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspect]);
   const [scene, setScene] = useState<Scene>(validMoment ? MOMENT_TYPES[validMoment].scene : "park");
   const [accessory, setAccessory] = useState<Accessory>("bandana");
   const [expression, setExpression] = useState<Expression>("happy");
@@ -85,8 +105,18 @@ function CreateInner() {
     setStickers((st) => st.map((s, j) => (j === i ? { ...s, x: Math.round(x), y: Math.round(y) } : s)));
   };
 
-  const post = () => {
+  const post = async () => {
     const id = `my_${newId()}`;
+    let finals: string[] = [];
+    if (raw.length) {
+      setBusy(true);
+      try {
+        finals = await Promise.all(raw.map((p) => renderPhoto(p.src, aspect, p.edit)));
+      } catch {
+        setBusy(false);
+        return toast("Couldn't prepare your photos. Try again?");
+      }
+    }
     dispatch({
       t: "post",
       post: {
@@ -95,8 +125,9 @@ function CreateInner() {
         scene,
         accessory,
         expression,
-        image,
-        images: photos.length > 1 ? photos : undefined,
+        image: finals[0],
+        images: finals.length > 1 ? finals : undefined,
+        aspect: aspect === "portrait" ? "portrait" : undefined,
         overlay: overlay.trim() || undefined,
         caption: caption.trim() || captionHint || "🐾",
         tags: tags
@@ -173,7 +204,7 @@ function CreateInner() {
           post={{ scene, accessory, expression, image, images: photos, overlay, frame }}
           pet={me}
           carousel
-          className="aspect-square rounded-[1.6rem]"
+          className={`${aspect === "portrait" ? "aspect-[4/5]" : "aspect-square"} rounded-[1.6rem]`}
         />
           <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.6rem]" style={{ containerType: "inline-size" }}>
             <Decorations
@@ -187,14 +218,25 @@ function CreateInner() {
         </div>
         {stickers.length > 0 && <p className="mt-1 text-center text-xs font-semibold text-muted">Drag stickers to move them</p>}
 
+        <div className="mt-3 flex items-center justify-center gap-2">
+          {(["square", "portrait"] as Aspect[]).map((a) => (
+            <button key={a} className="chip" data-on={aspect === a} onClick={() => setAspect(a)}>
+              {a === "square" ? "◻️ Square" : "▯ Portrait 4:5"}
+            </button>
+          ))}
+        </div>
+
         {photos.length > 0 && (
-          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
+          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pt-1.5">
             {photos.map((src, i) => (
               <div key={i} className="relative shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-xl object-cover" />
+                <button onClick={() => setEditing(i)} aria-label={`Edit photo ${i + 1}`} className="relative block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-xl object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-cocoa/70 py-0.5 text-center text-[10px] font-extrabold text-white">✏️ Edit</span>
+                </button>
                 <button
-                  onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))}
+                  onClick={() => setRaw((ps) => ps.filter((_, j) => j !== i))}
                   className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-cocoa text-xs font-bold text-white"
                   aria-label={`Remove photo ${i + 1}`}
                 >
@@ -220,8 +262,9 @@ function CreateInner() {
                 if (!files.length) return;
                 setBusy(true);
                 try {
-                  const urls = await Promise.all(files.map((f) => fileToDataUrl(f)));
-                  setPhotos((ps) => [...ps, ...urls].slice(0, MAX_PHOTOS));
+                  const urls = await Promise.all(files.map((f) => fileToDataUrl(f, 1600, 0.9)));
+                  setRaw((ps) => [...ps, ...urls.map((src) => ({ src, edit: { ...NO_EDIT } }))].slice(0, MAX_PHOTOS));
+                  if (!raw.length) setEditing(0);
                 } finally {
                   setBusy(false);
                 }
@@ -240,17 +283,28 @@ function CreateInner() {
         )}
 
         <div className="mt-5 space-y-3">
-          <p className="text-sm font-extrabold">Frame</p>
+          <p className="flex items-center text-sm font-extrabold">
+            <span className="flex-1">Frame</span>
+            <Link href="/shop" className="text-xs font-extrabold text-blush">
+              🛍️ Biscuit Shop
+            </Link>
+          </p>
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-            {FRAMES.map((f) => (
-              <button key={f.id} className="chip" data-on={frame === f.id} onClick={() => setFrame(f.id)}>
+            {ALL_FRAMES.map((f) => (
+              <button
+                key={f.id}
+                className="chip"
+                data-on={frame === f.id}
+                onClick={() => (owns(f.item) ? setFrame(f.id) : setBuying({ item: f.item!, then: () => setFrame(f.id) }))}
+              >
                 {f.label}
+                {!owns(f.item) && <span className="ml-1 text-xs opacity-70">🔒 {SHOP.find((i) => i.id === f.item)?.price}🍪</span>}
               </button>
             ))}
           </div>
           <p className="text-sm font-extrabold">Stickers {stickers.length > 0 && <span className="font-semibold text-muted">· {stickers.length}/6</span>}</p>
           <div className="flex flex-wrap gap-1.5">
-            {STICKERS.map((e) => (
+            {[...STICKERS, ...SHOP.filter((i) => i.kind === "stickers" && owns(i.id)).flatMap((i) => i.stickers!)].map((e) => (
               <button
                 key={e}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-sand text-xl disabled:opacity-40"
@@ -259,6 +313,15 @@ function CreateInner() {
                 aria-label={`Add ${e} sticker`}
               >
                 {e}
+              </button>
+            ))}
+            {SHOP.filter((i) => i.kind === "stickers" && !owns(i.id)).map((i) => (
+              <button
+                key={i.id}
+                className="flex h-10 items-center gap-1 rounded-xl border border-dashed border-oat bg-paper px-2.5 text-xs font-extrabold"
+                onClick={() => setBuying({ item: i.id })}
+              >
+                <span className="text-lg">{i.emoji}</span> 🔒 {i.price}🍪
               </button>
             ))}
             {stickers.length > 0 && (
@@ -315,7 +378,31 @@ function CreateInner() {
         </div>
 
         {picking && <TagPicker value={tagged} onChange={setTagged} onClose={() => setPicking(false)} />}
-        <button className="btn btn-pink mt-6 w-full text-lg" onClick={post} disabled={busy}>
+        {buying && <UnlockSheet itemId={buying.item} onClose={() => setBuying(null)} onUnlocked={buying.then} />}
+        {editing !== null && raw[editing] && (
+          <PhotoEditor
+            key={editing}
+            photo={raw[editing]}
+            aspect={aspect}
+            onAspect={setAspect}
+            count={raw.length}
+            onCancel={() => setEditing(null)}
+            onApplyFilterToAll={(filter) => {
+              setRaw((rs) => rs.map((r) => ({ ...r, edit: { ...r.edit, filter } })));
+              void Promise.all(raw.map((r) => renderPhoto(r.src, aspect, { ...r.edit, filter }))).then((outs) =>
+                setRaw((rs) => rs.map((r, i) => ({ ...r, out: outs[i] ?? r.out }))),
+              );
+              toast("Filter added to every photo ✨");
+            }}
+            onDone={async (p) => {
+              const i = editing;
+              setEditing(null);
+              const out = await renderPhoto(p.src, aspect, p.edit);
+              setRaw((rs) => rs.map((r, j) => (j === i ? { ...p, out } : r)));
+            }}
+          />
+        )}
+        <button className="btn btn-pink mt-6 w-full text-lg" onClick={() => void post()} disabled={busy}>
           <PawIcon size={20} /> Post Floof
         </button>
       </div>

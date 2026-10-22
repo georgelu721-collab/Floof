@@ -23,7 +23,7 @@ export default function Moments() {
 
       {hero ? (
         <Link href={`/post/${hero.id}`} className="card mx-4 block overflow-hidden">
-          <PostMedia post={hero} pet={me} className="aspect-[16/10]" />
+          <PostMedia post={hero} pet={me} className="aspect-[16/10]" hd />
           <div className="flex items-center gap-3 p-4">
             <span className="flex h-12 w-12 items-center justify-center rounded-full text-2xl" style={{ background: MOMENT_TYPES[hero.moment!].tint }}>
               {MOMENT_TYPES[hero.moment!].emoji}

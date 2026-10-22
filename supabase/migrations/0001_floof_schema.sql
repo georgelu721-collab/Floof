@@ -83,6 +83,10 @@ alter table public.posts add column if not exists edited_at timestamptz;
 alter table public.posts drop constraint if exists posts_tagged_max;
 alter table public.posts add constraint posts_tagged_max check (cardinality(tagged_pets) <= 10);
 create index if not exists posts_tagged_idx on public.posts using gin (tagged_pets);
+-- Added later: photo shape (square 1:1 or portrait 4:5).
+alter table public.posts add column if not exists aspect text not null default 'square';
+alter table public.posts drop constraint if exists posts_aspect_check;
+alter table public.posts add constraint posts_aspect_check check (aspect in ('square', 'portrait'));
 
 -- Added later: which day's Daily Floof prompt this post answers.
 alter table public.posts add column if not exists daily_date date;
@@ -129,13 +133,16 @@ create table if not exists public.follows (
 create table if not exists public.biscuit_ledger (
   id uuid primary key default gen_random_uuid(),
   pet_id text not null references public.pets (id) on delete cascade, -- whose wallet
-  kind text not null check (kind in ('welcome', 'topup', 'sent', 'received', 'redeem')),
+  kind text not null,
   amount int not null check (amount > 0),
   counterparty_id text references public.pets (id) on delete set null,
   post_id text references public.posts (id) on delete set null,
   note text,
   created_at timestamptz not null default now()
 );
+-- 'shop' = biscuits spent in the Biscuit Shop (frames, stickers, filters).
+alter table public.biscuit_ledger drop constraint if exists biscuit_ledger_kind_check;
+alter table public.biscuit_ledger add constraint biscuit_ledger_kind_check check (kind in ('welcome', 'topup', 'sent', 'received', 'redeem', 'shop'));
 create index if not exists ledger_pet_idx on public.biscuit_ledger (pet_id, created_at desc);
 create index if not exists ledger_post_idx on public.biscuit_ledger (post_id) where post_id is not null;
 
@@ -223,7 +230,7 @@ create trigger pets_welcome_biscuits
 after insert on public.pets
 for each row execute function public.welcome_biscuits();
 
--- Spendable wallet balance (welcome + top-ups − sent).
+-- Spendable wallet balance (welcome + top-ups − sent − shop).
 create or replace function public.wallet_balance(p_pet text)
 returns int
 language sql
@@ -232,7 +239,7 @@ security definer
 set search_path = public
 as $$
   select coalesce(sum(case when kind in ('welcome', 'topup') then amount
-                           when kind = 'sent' then -amount else 0 end), 0)::int
+                           when kind in ('sent', 'shop') then -amount else 0 end), 0)::int
   from public.biscuit_ledger where pet_id = p_pet;
 $$;
 
@@ -1002,6 +1009,141 @@ begin
     alter publication supabase_realtime add table public.message_reactions;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Biscuit Shop (premium frames, sticker packs, filters) and Pet Care notes
+-- ---------------------------------------------------------------------------
+
+-- Prices must match lib/shop.ts. NULL = not for sale.
+create or replace function public.shop_price(p_item text)
+returns int
+language sql
+immutable
+as $$
+  select case p_item
+    when 'frame:neon' then 20 when 'frame:rainbow' then 20 when 'frame:film' then 15
+    when 'frame:royal' then 25 when 'frame:stars' then 15 when 'frame:bones' then 15 when 'frame:blossom' then 15
+    when 'stickers:party' then 10 when 'stickers:spooky' then 10 when 'stickers:fancy' then 15
+    when 'stickers:snacks' then 10 when 'stickers:nature' then 10
+    when 'filter:shiba' then 10 when 'filter:siamese' then 10 when 'filter:dalmatian' then 10
+    when 'filter:poodle' then 10 when 'filter:persian' then 10
+  end;
+$$;
+
+-- Which sticker pack a premium sticker belongs to (NULL = free sticker).
+create or replace function public.shop_sticker_item(p_emoji text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when p_emoji in ('🥳', '🎂', '🎁', '🎈', '🪅') then 'stickers:party'
+    when p_emoji in ('🎃', '👻', '🦇', '🕸️', '🍬') then 'stickers:spooky'
+    when p_emoji in ('💎', '🎩', '🦄', '🌟', '💅') then 'stickers:fancy'
+    when p_emoji in ('🍕', '🍩', '🧁', '🍦', '🥓') then 'stickers:snacks'
+    when p_emoji in ('🍀', '🌻', '🦋', '🌙', '☀️') then 'stickers:nature'
+  end;
+$$;
+
+create table if not exists public.shop_unlocks (
+  pet_id text not null references public.pets (id) on delete cascade,
+  item text not null,
+  created_at timestamptz not null default now(),
+  primary key (pet_id, item)
+);
+alter table public.shop_unlocks enable row level security;
+drop policy if exists floof_unlocks_read on public.shop_unlocks;
+create policy floof_unlocks_read on public.shop_unlocks for select to authenticated using (public.owns_pet(pet_id));
+grant select on public.shop_unlocks to authenticated;
+
+-- Buy an item with wallet biscuits. Buying something you already own costs nothing.
+create or replace function public.buy_shop_item(p_pet text, p_item text)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  price int := public.shop_price(p_item);
+  bal int;
+begin
+  if not public.owns_pet(p_pet) then raise exception 'not your pet'; end if;
+  if price is null then raise exception 'unknown item'; end if;
+  perform pg_advisory_xact_lock(hashtext('wallet:' || p_pet));
+  if exists (select 1 from public.shop_unlocks where pet_id = p_pet and item = p_item) then
+    return public.wallet_balance(p_pet);
+  end if;
+  bal := public.wallet_balance(p_pet);
+  if bal < price then raise exception 'not enough biscuits'; end if;
+  insert into public.biscuit_ledger (pet_id, kind, amount, note) values (p_pet, 'shop', price, 'Biscuit Shop: ' || p_item);
+  insert into public.shop_unlocks (pet_id, item) values (p_pet, p_item);
+  return bal - price;
+end;
+$$;
+revoke all on function public.buy_shop_item(text, text) from public, anon;
+grant execute on function public.buy_shop_item(text, text) to authenticated;
+
+-- Premium frames and stickers can only be used by pets that unlocked them.
+create or replace function public.check_post_unlocks()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  need text;
+begin
+  if new.frame is not null and new.frame <> '' and public.shop_price('frame:' || new.frame) is not null
+     and (tg_op = 'INSERT' or new.frame is distinct from old.frame)
+     and not exists (select 1 from public.shop_unlocks u where u.pet_id = new.pet_id and u.item = 'frame:' || new.frame) then
+    raise exception 'unlock this frame in the Biscuit Shop first';
+  end if;
+  if tg_op = 'INSERT' or new.stickers is distinct from old.stickers then
+    for need in
+      select distinct public.shop_sticker_item(st ->> 'e')
+      from jsonb_array_elements(case when jsonb_typeof(new.stickers) = 'array' then new.stickers else '[]'::jsonb end) st
+    loop
+      if need is not null and not exists (select 1 from public.shop_unlocks u where u.pet_id = new.pet_id and u.item = need) then
+        raise exception 'unlock this sticker pack in the Biscuit Shop first';
+      end if;
+    end loop;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists posts_check_unlocks on public.posts;
+create trigger posts_check_unlocks before insert or update of frame, stickers on public.posts
+  for each row execute function public.check_post_unlocks();
+
+-- Private notes in Pet Care (vet instructions, food, quirks…). Shared with family members.
+create table if not exists public.pet_notes (
+  id uuid primary key default gen_random_uuid(),
+  pet_id text not null references public.pets (id) on delete cascade,
+  title text not null default '' check (char_length(title) <= 80),
+  body text not null default '' check (char_length(body) <= 4000),
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists pet_notes_pet_idx on public.pet_notes (pet_id, updated_at desc);
+alter table public.pet_notes enable row level security;
+drop policy if exists floof_notes_all on public.pet_notes;
+create policy floof_notes_all on public.pet_notes for all to authenticated using (public.owns_pet(pet_id)) with check (public.owns_pet(pet_id));
+grant select, insert, update, delete on public.pet_notes to authenticated;
+
+create or replace function public.touch_note()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  new.created_at := old.created_at;
+  new.pet_id := old.pet_id;
+  return new;
+end;
+$$;
+drop trigger if exists pet_notes_touch on public.pet_notes;
+create trigger pet_notes_touch before update on public.pet_notes for each row execute function public.touch_note();
 
 -- Make the Data API pick up new columns and tables straight away.
 notify pgrst, 'reload schema';

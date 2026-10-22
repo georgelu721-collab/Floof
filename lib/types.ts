@@ -108,6 +108,7 @@ export type Post = {
   stickers?: Sticker[];
   editedAt?: number;
   moderationNote?: string;
+  aspect?: "square" | "portrait";
 };
 
 export type Notification = {
@@ -173,7 +174,7 @@ export type Pack = {
 
 export type LedgerEntry = {
   id: string;
-  type: "sent" | "topup" | "received" | "redeem";
+  type: "sent" | "topup" | "received" | "redeem" | "shop";
   amount: number; // biscuits
   petId?: string;
   postId?: string; // the post a gift was sent on
@@ -197,6 +198,8 @@ export type Reminder = {
 };
 
 export type Weight = { id: string; date: string; kg: number };
+
+export type Note = { id: string; title: string; body: string; pinned: boolean; updatedAt: number };
 
 export type LostAlert = {
   id: string;

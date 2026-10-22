@@ -5,7 +5,8 @@ import { AFFINITY, DEMO_ALERTS, DEMO_PET_ID, demoReminders, PETS, POSTS } from "
 import { CLOUD, sb } from "./supabase";
 import { loadSnapshot, moderatePost, pickPet, remote, subscribeToMessages, subscribeToReactions, uploadPhoto, type Snapshot } from "./cloud";
 import { addDays, dailyStreak, dayKey, fromKey, levelFor, postingStreak } from "./daily";
-import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Pet, Playdate, Post, Reminder, Story, Thread, Weight } from "./types";
+import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Note, Pet, Playdate, Post, Reminder, Story, Thread, Weight } from "./types";
+import { shopItem } from "./shop";
 
 type State = {
   me: string | null;
@@ -46,6 +47,8 @@ type State = {
   deletedStories: Record<string, true>;
   postEdits: Record<string, Partial<Post>>;
   localPets: string[]; // local demo: pets used on this device
+  unlocks: Record<string, true>; // Biscuit Shop items this pet owns
+  notes: Note[];
 };
 
 const initial: State = {
@@ -87,6 +90,8 @@ const initial: State = {
   deletedStories: {},
   postEdits: {},
   localPets: [],
+  unlocks: {},
+  notes: [],
 };
 
 export type Action =
@@ -136,7 +141,10 @@ export type Action =
   | { t: "pawFive"; petId: string }
   | { t: "invitePlaydate"; playdate: Playdate }
   | { t: "playdateStatus"; id: string; status: Playdate["status"] }
-  | { t: "switchPet"; petId: string };
+  | { t: "switchPet"; petId: string }
+  | { t: "unlock"; item: string }
+  | { t: "saveNote"; note: Note }
+  | { t: "deleteNote"; id: string };
 
 const bump = (m: Record<string, number>, id: string, n: number) => ({ ...m, [id]: (m[id] ?? 0) + n });
 /** Remember that I interacted with a pet today (for best-friend streaks). */
@@ -191,6 +199,8 @@ function reducer(s: State, a: Action): State {
         // A new pet starts with a clean slate (the demo's sample care data belongs to Big Mac).
         reminders: [],
         weights: [],
+        notes: [],
+        unlocks: {},
         dailyVotes: {},
         interactionDays: {},
       };
@@ -251,6 +261,20 @@ function reducer(s: State, a: Action): State {
         received: s.received - a.amount,
         ledger: [{ id: uid(), type: "redeem", amount: a.amount, note: a.note, at: Date.now() }, ...s.ledger],
       };
+    case "unlock": {
+      const price = shopItem(a.item)?.price;
+      if (!price || s.unlocks[a.item] || price > s.balance) return s;
+      return {
+        ...s,
+        balance: s.balance - price,
+        unlocks: { ...s.unlocks, [a.item]: true },
+        ledger: [{ id: uid(), type: "shop", amount: price, note: `Biscuit Shop: ${shopItem(a.item)!.name}`, at: Date.now() }, ...s.ledger],
+      };
+    }
+    case "saveNote":
+      return { ...s, notes: [a.note, ...s.notes.filter((n) => n.id !== a.note.id)] };
+    case "deleteNote":
+      return { ...s, notes: s.notes.filter((n) => n.id !== a.id) };
     case "joinClan":
       return { ...s, clan: a.clan };
     case "clanFloof":
@@ -472,6 +496,12 @@ async function syncAction(a: Action, before: State, me: string) {
       return remote.invitePlaydate(a.playdate);
     case "playdateStatus":
       return remote.playdateStatus(a.id, a.status);
+    case "unlock":
+      return before.unlocks[a.item] ? undefined : remote.unlock(me, a.item);
+    case "saveNote":
+      return remote.saveNote(me, a.note);
+    case "deleteNote":
+      return remote.deleteNote(a.id);
   }
 }
 
@@ -712,6 +742,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (a.t === "sendBiscuits" && a.amount > stateRef.current.balance) return false;
+      if (a.t === "unlock" && (shopItem(a.item)?.price ?? Infinity) > stateRef.current.balance) return false;
       const hasPhotos = a.t === "post" && !!(a.post.image || a.post.images?.length);
       if (a.t === "post" && hasPhotos) a = { ...a, post: { ...a.post, status: "pending" } };
       const before = stateRef.current;

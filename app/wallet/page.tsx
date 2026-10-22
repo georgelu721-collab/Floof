@@ -50,6 +50,15 @@ export default function Wallet() {
       </div>
       <p className="px-6 pt-2 text-center text-xs text-muted">Demo mode — no real payment is taken. Payments would be processed by Lyca Marketplace.</p>
 
+      <Link href="/shop" className="card mx-4 mt-4 flex items-center gap-3 p-4">
+        <span className="text-3xl">🛍️</span>
+        <span className="flex-1 leading-tight">
+          <span className="block font-display text-lg font-semibold">Biscuit Shop</span>
+          <span className="text-xs font-bold text-muted">Spend biscuits on borders, sticker packs & filters</span>
+        </span>
+        <span className="text-xl text-muted">›</span>
+      </Link>
+
       <SectionTitle>{me.name}&apos;s earnings</SectionTitle>
       <section className="card mx-4 p-4">
         <div className="flex items-center justify-between">
@@ -91,14 +100,14 @@ export default function Wallet() {
               )}
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="truncate text-sm font-extrabold">
-                  {l.type === "sent" ? `Sent to ${p?.name ?? "a floof"}` : l.type === "received" ? `From ${p?.name ?? "a fan"}` : l.type === "redeem" ? "Redeemed" : "Top-up"}
+                  {l.type === "sent" ? `Sent to ${p?.name ?? "a floof"}` : l.type === "received" ? `From ${p?.name ?? "a fan"}` : l.type === "redeem" ? "Redeemed" : l.type === "shop" ? "Biscuit Shop" : "Top-up"}
                 </p>
                 <p className="truncate text-xs font-semibold text-muted">
                   {l.note ?? ""} {l.at ? `· ${timeAgo(l.at)}` : ""}
                 </p>
               </div>
-              <span className={`font-extrabold ${l.type === "sent" || l.type === "redeem" ? "text-cocoa-soft" : "text-sage"}`}>
-                {l.type === "sent" || l.type === "redeem" ? "−" : "+"}
+              <span className={`font-extrabold ${l.type === "sent" || l.type === "redeem" || l.type === "shop" ? "text-cocoa-soft" : "text-sage"}`}>
+                {l.type === "sent" || l.type === "redeem" || l.type === "shop" ? "−" : "+"}
                 {l.amount} 🍪
               </span>
             </li>

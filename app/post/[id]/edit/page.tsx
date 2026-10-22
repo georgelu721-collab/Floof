@@ -56,7 +56,7 @@ export default function EditPost() {
     <main className="pb-10">
       <TopBar title="Edit floof" />
       <div className="space-y-3 px-4">
-        <PostMedia post={p} pet={pet(p.petId)!} className="aspect-[4/3] rounded-3xl" />
+        <PostMedia post={p} pet={pet(p.petId)!} className="aspect-[4/3] rounded-3xl" hd />
         <textarea className="input min-h-24 !rounded-3xl" value={caption} maxLength={500} onChange={(e) => setCaption(e.target.value)} placeholder="Caption" />
         <input className="input" placeholder="#tags (space separated)" value={tags} onChange={(e) => setTags(e.target.value)} />
         <div className="relative">

@@ -68,13 +68,13 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'dc2d3a21-8ca0-4c61-a7ee-c6eb96ef0d70'::uuid, 'p1', 'luna', 'So cute!! I would never let them do this to me', 14, now() - interval '3 hours'
+select '6bc872a0-9571-461b-9999-0ec7e178d1d5'::uuid, 'p1', 'luna', 'So cute!! I would never let them do this to me', 14, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'luna' and text = 'So cute!! I would never let them do this to me');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a1faaed5-af4b-4292-9af0-ca0785926ccc'::uuid, 'p1', 'ollie', 'Happiness in a photo 🥹', 8, now() - interval '2 hours'
+select '65e9820b-d1e4-42de-90b6-a853b5d34f65'::uuid, 'p1', 'ollie', 'Happiness in a photo 🥹', 8, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'ollie' and text = 'Happiness in a photo 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '320fa0aa-08df-42f1-9273-b22af912e70a'::uuid, 'p1', 'biscuit', 'Hair goals tbh', 5, now() - interval '1 hours'
+select '944dd8ae-a510-447b-bb73-870f6baa36a1'::uuid, 'p1', 'biscuit', 'Hair goals tbh', 5, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p1' and pet_id = 'biscuit' and text = 'Hair goals tbh');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p2', 'biscuit', 'expo', 'bandana', 'happy', '/photos/post-p2.jpg', array['/photos/post-p2.jpg', '/photos/post-p2-2.jpg', '/photos/post-p2-3.jpg']::text[], null, 'First time at the Pet Expo! Made a new bestie 😍', array['PetExpo', 'GoodBoy', 'FloofLife']::text[], 'Sydney Showground', 'first-expo', null, 28700, 420, 0, now() - interval '5 hours')
@@ -82,19 +82,19 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'e4e25834-d55f-46ba-8599-639bde99bbba'::uuid, 'p2', 'toby', 'Was that you at the treat stand?? 👀', 22, now() - interval '5 hours'
+select '3b2eddbe-5585-4d27-868a-b5bb1fc0ea1b'::uuid, 'p2', 'toby', 'Was that you at the treat stand?? 👀', 22, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'toby' and text = 'Was that you at the treat stand?? 👀');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'd8cb3b52-6ae7-4d5f-8ceb-6fde2261b82d'::uuid, 'p2', 'mochi', 'See you next year bestie!', 17, now() - interval '4 hours'
+select '2c129877-5aa4-45c8-a13c-cd61845a2af2'::uuid, 'p2', 'mochi', 'See you next year bestie!', 17, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'mochi' and text = 'See you next year bestie!');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'd0897cf4-5dff-429f-977a-35667b54e7b5'::uuid, 'p2', 'luna', 'Iconic.', 27, now() - interval '3 hours'
+select '77789b4f-17f5-4c54-9a2e-2b04aa081d0f'::uuid, 'p2', 'luna', 'Iconic.', 27, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'luna' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '9a723d93-52c5-4a83-8a9b-f3d6afd97ca8'::uuid, 'p2', 'peanut', 'Boop boop boop 🐾', 34, now() - interval '4 hours'
+select '6825906f-d2de-42c4-964e-c5c4f9056383'::uuid, 'p2', 'peanut', 'Boop boop boop 🐾', 34, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'peanut' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'b8b8c64b-6d3c-4247-adcf-894810901ffa'::uuid, 'p2', 'mochi', 'Can we be friends?', 1, now() - interval '5 hours'
+select 'f74c4e82-a8a6-494a-a134-546f7ab080f1'::uuid, 'p2', 'mochi', 'Can we be friends?', 1, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p2' and pet_id = 'mochi' and text = 'Can we be friends?');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p3', 'toby', 'beach', 'none', 'happy', '/photos/post-p3.jpg', array['/photos/post-p3.jpg', '/photos/post-p3-2.jpg']::text[], 'first time at the beach!', 'First swim of the season! 🌊 Wouldn''t have it any other way 💙', array['firstmoment', 'beachday', 'goodboy']::text[], 'Bondi Beach', 'first-beach', null, 1200, 12, 0, now() - interval '7 hours')
@@ -102,25 +102,25 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '193bde84-60e9-4017-9d6f-eaa4e3db9b22'::uuid, 'p3', 'rex', 'I''ll stick to the sand thanks', 3, now() - interval '6 hours'
+select 'eb3386d3-1f00-4357-9fa4-2f6f513fbb11'::uuid, 'p3', 'rex', 'I''ll stick to the sand thanks', 3, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'rex' and text = 'I''ll stick to the sand thanks');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '7c26f294-912c-4b7c-b6da-7e83f806d5f9'::uuid, 'p3', 'bigmac', 'Need this energy today', 33, now() - interval '2 hours'
+select '3c67adb5-93bb-4539-9005-33529b3dde2e'::uuid, 'p3', 'bigmac', 'Need this energy today', 33, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'bigmac' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '9afea7cd-3b3f-4dda-8324-1cdfb7689f57'::uuid, 'p3', 'ollie', 'So cute!! 😍', 0, now() - interval '3 hours'
+select 'bfc158d8-1985-47ee-9e21-e654bc636aa1'::uuid, 'p3', 'ollie', 'So cute!! 😍', 0, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'ollie' and text = 'So cute!! 😍');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '20806ca7-e1ce-4288-bd59-f5537e264ed2'::uuid, 'p3', 'rex', 'Iconic.', 7, now() - interval '4 hours'
+select '9e560038-d3a9-4b21-b993-387625513da6'::uuid, 'p3', 'rex', 'Iconic.', 7, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'rex' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'dcd76247-8016-4fab-b15a-d8c309edfde6'::uuid, 'p3', 'nala', 'Boop boop boop 🐾', 14, now() - interval '5 hours'
+select '66f1183b-44f4-4da3-bb7a-91674f5742a0'::uuid, 'p3', 'nala', 'Boop boop boop 🐾', 14, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'nala' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '4fa76d7d-7f00-4af2-a2eb-44c65fa13e13'::uuid, 'p3', 'miso', 'Can we be friends?', 21, now() - interval '6 hours'
+select '0dd51084-10af-481b-b063-a79107e9ec51'::uuid, 'p3', 'miso', 'Can we be friends?', 21, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'miso' and text = 'Can we be friends?');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'e0920842-35c1-49e4-953e-2a59652afdba'::uuid, 'p3', 'biscuit', 'Absolute floof goals', 28, now() - interval '7 hours'
+select 'f7537b3e-9a57-414b-93b9-62860715a7ef'::uuid, 'p3', 'biscuit', 'Absolute floof goals', 28, now() - interval '7 hours'
 where not exists (select 1 from public.comments where post_id = 'p3' and pet_id = 'biscuit' and text = 'Absolute floof goals');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p4', 'luna', 'night', 'none', 'sleepy', '/photos/post-p4.jpg', array['/photos/post-p4.jpg']::text[], null, 'Do not disturb. Ever. 😎', array['catnap', 'sleepy']::text[], 'Sydney, Australia', null, null, 9800, 96, 0, now() - interval '9 hours')
@@ -128,16 +128,16 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '836b6f81-f8f2-42eb-a4db-5e10a553e75c'::uuid, 'p4', 'pepper', 'Respect.', 30, now() - interval '1 hours'
+select 'a2ea6c88-97a4-4717-bbb8-6df00394b4f4'::uuid, 'p4', 'pepper', 'Respect.', 30, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p4' and pet_id = 'pepper' and text = 'Respect.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'd3811cd8-c2fe-455d-99b0-ab9ead90db06'::uuid, 'p4', 'toby', 'The cutest thing on Floof today', 6, now() - interval '2 hours'
+select '8340a509-1d5e-48d3-9cab-a5e37ced65d7'::uuid, 'p4', 'toby', 'The cutest thing on Floof today', 6, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p4' and pet_id = 'toby' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'abb5765e-9111-4450-8e6e-2e094e169f69'::uuid, 'p4', 'clover', 'Need this energy today', 13, now() - interval '3 hours'
+select 'b4075e31-dee7-477b-972e-2f9caa16daec'::uuid, 'p4', 'clover', 'Need this energy today', 13, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p4' and pet_id = 'clover' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '6e9fc139-9549-4614-89c2-deb2681f9464'::uuid, 'p4', 'biscuit', 'So cute!! 😍', 20, now() - interval '4 hours'
+select '991b75e7-15a4-4551-a2db-327117479015'::uuid, 'p4', 'biscuit', 'So cute!! 😍', 20, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p4' and pet_id = 'biscuit' and text = 'So cute!! 😍');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p5', 'mochi', 'blossom', 'flowers', 'happy', '/photos/post-p5.jpg', array['/photos/post-p5.jpg']::text[], 'good day!!', 'Park zoomies 🌸 More walks, more sniffing, more happiness ♡', array['flooflife', 'samoyed', 'happydog', 'sunnyday']::text[], 'Royal Botanic Garden', null, null, 15200, 230, 0, now() - interval '12 hours')
@@ -145,22 +145,22 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '51f30034-3e33-46b7-a868-c42934851677'::uuid, 'p5', 'nala', 'Prettiest floof in the garden', 11, now() - interval '12 hours'
+select 'f25c5413-5bb7-423f-9d6c-1ee58a35e38d'::uuid, 'p5', 'nala', 'Prettiest floof in the garden', 11, now() - interval '12 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'nala' and text = 'Prettiest floof in the garden');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'aad73485-bb1b-4be1-ac48-abcfdc43cdf2'::uuid, 'p5', 'pepper', 'Look at that face 🥹', 19, now() - interval '2 hours'
+select '26656682-a35a-437d-9480-8a75a543399f'::uuid, 'p5', 'pepper', 'Look at that face 🥹', 19, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'pepper' and text = 'Look at that face 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ebe6f9be-9d64-4ffd-9f8e-553d4dea6dd7'::uuid, 'p5', 'bigmac', 'The cutest thing on Floof today', 26, now() - interval '3 hours'
+select 'f592c237-59a5-4e24-9480-efa4afbf45d1'::uuid, 'p5', 'bigmac', 'The cutest thing on Floof today', 26, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'bigmac' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'fbdd6e91-e9e3-4429-a504-54f5c3bca8ed'::uuid, 'p5', 'ollie', 'Need this energy today', 33, now() - interval '4 hours'
+select '8769857f-0f31-4c67-a7a8-b12a3daa9dc1'::uuid, 'p5', 'ollie', 'Need this energy today', 33, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'ollie' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ef15a4b0-2af5-4b09-8022-abf31fcb7f17'::uuid, 'p5', 'rex', 'So cute!! 😍', 0, now() - interval '5 hours'
+select 'af749a42-503f-49d2-a691-e5bd9322a694'::uuid, 'p5', 'rex', 'So cute!! 😍', 0, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'rex' and text = 'So cute!! 😍');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '4541af26-68b4-443f-930f-61e816d17a0d'::uuid, 'p5', 'nala', 'Iconic.', 7, now() - interval '6 hours'
+select '694a9cfa-e5ff-485d-9ef9-334467f344b0'::uuid, 'p5', 'nala', 'Iconic.', 7, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p5' and pet_id = 'nala' and text = 'Iconic.');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p6', 'miso', 'cozy', 'none', 'smile', '/photos/post-p6.jpg', array['/photos/post-p6.jpg']::text[], null, 'Found the one warm patch in the house ☀️', array['orangecat', 'sunbeam']::text[], 'Gold Coast', null, null, 6400, 44, 0, now() - interval '14 hours')
@@ -168,13 +168,13 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'cbef9f16-de44-44f7-bc54-a14b53132540'::uuid, 'p6', 'toby', 'This made my day ♡', 25, now() - interval '1 hours'
+select 'f6045564-e9e3-47b3-bb28-1a07d699855f'::uuid, 'p6', 'toby', 'This made my day ♡', 25, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p6' and pet_id = 'toby' and text = 'This made my day ♡');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a059fe79-18df-413d-998e-3463b2715539'::uuid, 'p6', 'clover', 'My human would steal you instantly', 32, now() - interval '2 hours'
+select '7592de7c-5aed-4ff6-a04a-fdb74f90b840'::uuid, 'p6', 'clover', 'My human would steal you instantly', 32, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p6' and pet_id = 'clover' and text = 'My human would steal you instantly');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '6ce2f5fe-e5e1-4b51-926d-8868043542ec'::uuid, 'p6', 'biscuit', 'Look at that face 🥹', 39, now() - interval '3 hours'
+select '1bd1af62-8d61-4413-8bb5-091e6efba98d'::uuid, 'p6', 'biscuit', 'Look at that face 🥹', 39, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p6' and pet_id = 'biscuit' and text = 'Look at that face 🥹');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p7', 'bigmac', 'park', 'bandana', 'happy', '/photos/post-p7.jpg', array['/photos/post-p7.jpg']::text[], null, 'Park zoomies with my bestie Mochi 🐾', array['zoomies', 'shiba', 'bestfriends']::text[], 'Centennial Park', 'first-park', null, 4200, 61, 0, now() - interval '1 days')
@@ -182,19 +182,19 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '57b6bbcf-d906-414c-ab28-a870de3ea401'::uuid, 'p7', 'mochi', 'Best day ever!!', 19, now() - interval '1 days'
+select '862c38ec-10d8-4ae8-b514-e39bbd0f0e9d'::uuid, 'p7', 'mochi', 'Best day ever!!', 19, now() - interval '1 days'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'mochi' and text = 'Best day ever!!');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '477d8ba1-527a-4dd5-8bed-12b0f27261cf'::uuid, 'p7', 'luna', 'This made my day ♡', 5, now() - interval '2 hours'
+select '932abf0a-679c-4435-940b-796b45145d93'::uuid, 'p7', 'luna', 'This made my day ♡', 5, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'luna' and text = 'This made my day ♡');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '0525f663-872e-43c8-8975-f0d1e731d007'::uuid, 'p7', 'pepper', 'My human would steal you instantly', 12, now() - interval '3 hours'
+select '5c062669-2d1d-4390-8ad9-26f3ef84e9d9'::uuid, 'p7', 'pepper', 'My human would steal you instantly', 12, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'pepper' and text = 'My human would steal you instantly');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c68792d1-10c9-460a-9074-062f652caf91'::uuid, 'p7', 'mochi', 'Look at that face 🥹', 19, now() - interval '4 hours'
+select '81e37da7-3ca4-47da-8a52-a7e3a30786aa'::uuid, 'p7', 'mochi', 'Look at that face 🥹', 19, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'mochi' and text = 'Look at that face 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a461aae7-349d-4022-b0ec-f3e20f67c75e'::uuid, 'p7', 'ollie', 'The cutest thing on Floof today', 26, now() - interval '5 hours'
+select '2e847a9b-fb7a-4f84-8623-e23846ec366e'::uuid, 'p7', 'ollie', 'The cutest thing on Floof today', 26, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p7' and pet_id = 'ollie' and text = 'The cutest thing on Floof today');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p8', 'nala', 'blossom', 'flowers', 'smile', '/photos/post-p8.jpg', array['/photos/post-p8.jpg']::text[], null, 'Spring princess reporting for duty 🌼', array['ragdoll', 'spring']::text[], 'Brisbane', null, null, 7300, 81, 0, now() - interval '1 days')
@@ -202,25 +202,25 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '6fddeb2b-70c4-44ed-a648-7758b922e982'::uuid, 'p8', 'rex', '10/10 would boop again', 11, now() - interval '1 hours'
+select '18fb2a35-df04-4174-9e0b-348d87e12175'::uuid, 'p8', 'rex', '10/10 would boop again', 11, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'rex' and text = '10/10 would boop again');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'fff06ae8-2d4e-4acc-9d5c-431a9534b0fa'::uuid, 'p8', 'toby', 'Sending biscuits your way 🍪', 18, now() - interval '2 hours'
+select '7bcca432-3206-43e2-95e8-cffda28c0a61'::uuid, 'p8', 'toby', 'Sending biscuits your way 🍪', 18, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'toby' and text = 'Sending biscuits your way 🍪');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '34f0e2e8-37af-49d5-a627-654124f50092'::uuid, 'p8', 'miso', 'This made my day ♡', 25, now() - interval '3 hours'
+select 'ea093657-b50e-43c0-bf88-ec36e981f2b7'::uuid, 'p8', 'miso', 'This made my day ♡', 25, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'miso' and text = 'This made my day ♡');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '019e174e-f402-4511-b84e-e70467e11089'::uuid, 'p8', 'biscuit', 'My human would steal you instantly', 32, now() - interval '4 hours'
+select '70215ea4-bd9c-43ef-a5b1-dcdfedeb84d1'::uuid, 'p8', 'biscuit', 'My human would steal you instantly', 32, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'biscuit' and text = 'My human would steal you instantly');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '85bcabe8-2d26-4d58-9744-2720c42b2f0a'::uuid, 'p8', 'clover', 'Look at that face 🥹', 39, now() - interval '5 hours'
+select '7e13e713-d21c-48e1-a90b-be6ae43c693d'::uuid, 'p8', 'clover', 'Look at that face 🥹', 39, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'clover' and text = 'Look at that face 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ecc11018-5607-49e0-bba5-4d74f7b1297b'::uuid, 'p8', 'luna', 'The cutest thing on Floof today', 6, now() - interval '6 hours'
+select 'f07a15fe-0643-4e7f-bd23-2b97c5f9a6f7'::uuid, 'p8', 'luna', 'The cutest thing on Floof today', 6, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'luna' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a64878d9-de1b-47f8-a73e-610f791d0d2d'::uuid, 'p8', 'peanut', 'Need this energy today', 13, now() - interval '7 hours'
+select '4f7ba9a4-5c8a-452b-805e-750fef8acc6e'::uuid, 'p8', 'peanut', 'Need this energy today', 13, now() - interval '7 hours'
 where not exists (select 1 from public.comments where post_id = 'p8' and pet_id = 'peanut' and text = 'Need this energy today');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p9', 'peanut', 'cozy', 'party', 'smile', '/photos/post-p9.jpg', array['/photos/post-p9.jpg']::text[], '8 months old!', 'Celebrated with a sunflower seed cake 🎉', array['hamster', 'birthday']::text[], null, 'first-birthday', null, 2100, 33, 0, now() - interval '1 days')
@@ -228,16 +228,16 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '674d8e43-c7cd-45bb-b5de-1d0a7cb901c6'::uuid, 'p9', 'luna', 'Absolute floof goals', 24, now() - interval '1 hours'
+select '82d2f6ac-ae8a-4a92-b147-e3f3c0669281'::uuid, 'p9', 'luna', 'Absolute floof goals', 24, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p9' and pet_id = 'luna' and text = 'Absolute floof goals');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '9d7ad04b-e28b-447a-9ede-cdc2313dacd5'::uuid, 'p9', 'pepper', '10/10 would boop again', 31, now() - interval '2 hours'
+select '03cf255a-383a-4ea9-ab94-10a0b96182fc'::uuid, 'p9', 'pepper', '10/10 would boop again', 31, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p9' and pet_id = 'pepper' and text = '10/10 would boop again');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'bb0f9ae3-bdc7-48aa-9f2e-dbcb229a1f10'::uuid, 'p9', 'mochi', 'Sending biscuits your way 🍪', 38, now() - interval '3 hours'
+select 'be57a146-e7d1-4280-9135-065fe03d6fa8'::uuid, 'p9', 'mochi', 'Sending biscuits your way 🍪', 38, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p9' and pet_id = 'mochi' and text = 'Sending biscuits your way 🍪');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '515b34f6-a869-45bc-91ea-4a779b4d988d'::uuid, 'p9', 'ollie', 'This made my day ♡', 5, now() - interval '4 hours'
+select '860b003d-49d0-4cfb-a800-da4e55c94914'::uuid, 'p9', 'ollie', 'This made my day ♡', 5, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p9' and pet_id = 'ollie' and text = 'This made my day ♡');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p10', 'ollie', 'vet', 'bandana', 'smile', '/photos/post-p10.jpg', array['/photos/post-p10.jpg']::text[], 'brave boy', 'First vet visit — wore my disguise 😎🩺', array['firstmoment', 'chowchow']::text[], 'Perth', 'first-vet', null, 3100, 27, 0, now() - interval '2 days')
@@ -245,22 +245,22 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '5e60f2df-8a1d-4af2-b6a1-ad5aaf5636fc'::uuid, 'p10', 'nala', 'Can we be friends?', 37, now() - interval '1 hours'
+select '748bd8ee-f025-426d-8e3c-077e91fccd9c'::uuid, 'p10', 'nala', 'Can we be friends?', 37, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'nala' and text = 'Can we be friends?');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '8cfb58b3-331b-4190-a1ac-e15ea3d8737a'::uuid, 'p10', 'rex', 'Absolute floof goals', 4, now() - interval '2 hours'
+select 'a865d7fc-acdd-4424-bb45-daaaa200b64d'::uuid, 'p10', 'rex', 'Absolute floof goals', 4, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'rex' and text = 'Absolute floof goals');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a1d1a941-448d-4c1f-a4a9-299c34ff2211'::uuid, 'p10', 'toby', '10/10 would boop again', 11, now() - interval '3 hours'
+select '2a40d42c-488c-4743-931f-801f2e15386c'::uuid, 'p10', 'toby', '10/10 would boop again', 11, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'toby' and text = '10/10 would boop again');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '9aae2d6d-75a8-4b92-8f53-b969baa469a7'::uuid, 'p10', 'miso', 'Sending biscuits your way 🍪', 18, now() - interval '4 hours'
+select '234948e2-8de0-49d9-9351-0ddaa26b2720'::uuid, 'p10', 'miso', 'Sending biscuits your way 🍪', 18, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'miso' and text = 'Sending biscuits your way 🍪');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'cc361d43-715c-48c3-a35e-8a52de78aa59'::uuid, 'p10', 'biscuit', 'This made my day ♡', 25, now() - interval '5 hours'
+select '9532caeb-bdbf-41eb-8cb4-7b0c7c7fe566'::uuid, 'p10', 'biscuit', 'This made my day ♡', 25, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'biscuit' and text = 'This made my day ♡');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '0697799c-f0a1-4b0c-badc-e38051e1fa9c'::uuid, 'p10', 'clover', 'My human would steal you instantly', 32, now() - interval '6 hours'
+select '33806e04-aee3-43d4-9bc1-592475edcb98'::uuid, 'p10', 'clover', 'My human would steal you instantly', 32, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p10' and pet_id = 'clover' and text = 'My human would steal you instantly');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p11', 'clover', 'park', 'flowers', 'smile', '/photos/post-p11.jpg', array['/photos/post-p11.jpg']::text[], null, 'Binkies in the clover patch 🍀', array['bunny', 'binky']::text[], null, null, null, 5100, 52, 0, now() - interval '2 days')
@@ -268,13 +268,13 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c7f95e62-0a9d-455d-a08e-ae2e1851f61d'::uuid, 'p11', 'peanut', 'Boop boop boop 🐾', 10, now() - interval '1 hours'
+select '8eb5c643-fb9f-4b57-9c45-c7e94634e3de'::uuid, 'p11', 'peanut', 'Boop boop boop 🐾', 10, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p11' and pet_id = 'peanut' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ca7f1e36-ab58-4f3c-954b-05367b9d216a'::uuid, 'p11', 'luna', 'Can we be friends?', 17, now() - interval '2 hours'
+select '45e5bb7b-7568-4deb-add3-b645c2bf0399'::uuid, 'p11', 'luna', 'Can we be friends?', 17, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p11' and pet_id = 'luna' and text = 'Can we be friends?');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a996fe80-4cf1-45c6-8c25-b96b3a4c0e2c'::uuid, 'p11', 'pepper', 'Absolute floof goals', 24, now() - interval '3 hours'
+select 'da52c38c-3a29-4b4d-bd48-57342a59004d'::uuid, 'p11', 'pepper', 'Absolute floof goals', 24, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p11' and pet_id = 'pepper' and text = 'Absolute floof goals');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p12', 'rex', 'sunset', 'sunglasses', 'happy', '/photos/post-p12.jpg', array['/photos/post-p12.jpg']::text[], null, 'New hoodie, who dis 😎', array['frenchie', 'ootd']::text[], null, null, null, 20400, 140, 0, now() - interval '2 days')
@@ -282,19 +282,19 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '33df3fd4-3bf0-4db0-b7ee-31b2d16acfb9'::uuid, 'p12', 'bigmac', 'Iconic.', 23, now() - interval '1 hours'
+select '45e84c51-baa2-4499-8191-f7903ebcbc7a'::uuid, 'p12', 'bigmac', 'Iconic.', 23, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p12' and pet_id = 'bigmac' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'af199568-34c1-4552-b795-45809c9de132'::uuid, 'p12', 'nala', 'Boop boop boop 🐾', 30, now() - interval '2 hours'
+select '839576ad-9dce-4574-9ed5-54c99f1a4e2e'::uuid, 'p12', 'nala', 'Boop boop boop 🐾', 30, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p12' and pet_id = 'nala' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '9c5f2931-1d05-4f7e-b6e8-f69d4d6b658d'::uuid, 'p12', 'miso', 'Can we be friends?', 37, now() - interval '3 hours'
+select '93d4df5c-692d-496a-872f-9fd42420121c'::uuid, 'p12', 'miso', 'Can we be friends?', 37, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p12' and pet_id = 'miso' and text = 'Can we be friends?');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '59ba319d-2f3d-499f-bbbd-d8b143ca15d4'::uuid, 'p12', 'toby', 'Absolute floof goals', 4, now() - interval '4 hours'
+select 'd507425c-6e17-4f14-a3fb-658466e7fefa'::uuid, 'p12', 'toby', 'Absolute floof goals', 4, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p12' and pet_id = 'toby' and text = 'Absolute floof goals');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c3cd1588-2e23-4b90-b716-6368d5ce3ef5'::uuid, 'p12', 'clover', '10/10 would boop again', 11, now() - interval '5 hours'
+select '4451919a-5d73-47f8-a2ac-1c01b1361974'::uuid, 'p12', 'clover', '10/10 would boop again', 11, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p12' and pet_id = 'clover' and text = '10/10 would boop again');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p13', 'pepper', 'party', 'crown', 'wink', '/photos/post-p13.jpg', array['/photos/post-p13.jpg']::text[], null, 'Gotcha Day #6. Exhausted from ruling this house 👑', array['tuxedocat', 'gotchaday']::text[], null, 'gotcha-day', null, 4800, 70, 0, now() - interval '3 days')
@@ -302,25 +302,25 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c58e61d3-e29d-4050-9518-c0ddf5eab612'::uuid, 'p13', 'biscuit', 'So cute!! 😍', 36, now() - interval '1 hours'
+select 'fb9d7d6c-ed17-430a-8a95-7fd4c1fddfd9'::uuid, 'p13', 'biscuit', 'So cute!! 😍', 36, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'biscuit' and text = 'So cute!! 😍');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'ebf3efc0-3597-4aa7-b986-c5856e68a8ba'::uuid, 'p13', 'clover', 'Iconic.', 3, now() - interval '2 hours'
+select 'bdc62a1e-8fb4-456d-aafb-9a19af07e8fc'::uuid, 'p13', 'clover', 'Iconic.', 3, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'clover' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '36ea2212-183a-40e6-a20f-ce3386e2d151'::uuid, 'p13', 'luna', 'Boop boop boop 🐾', 10, now() - interval '3 hours'
+select 'a1c52843-95e5-4dd0-aed4-02384e344c40'::uuid, 'p13', 'luna', 'Boop boop boop 🐾', 10, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'luna' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'f07998d2-9f27-407a-a29e-09365b2be72b'::uuid, 'p13', 'peanut', 'Can we be friends?', 17, now() - interval '4 hours'
+select '74600e49-94cf-4b35-8cd9-256866590573'::uuid, 'p13', 'peanut', 'Can we be friends?', 17, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'peanut' and text = 'Can we be friends?');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'f341940d-f5ed-4dc4-b0af-3555ce8c5d5b'::uuid, 'p13', 'mochi', 'Absolute floof goals', 24, now() - interval '5 hours'
+select 'ae352bb3-c9cb-435b-8473-1ba340fe615c'::uuid, 'p13', 'mochi', 'Absolute floof goals', 24, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'mochi' and text = 'Absolute floof goals');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '655e4bb2-5864-475a-b987-44060bda115c'::uuid, 'p13', 'ollie', '10/10 would boop again', 31, now() - interval '6 hours'
+select 'bf7fba78-5c5d-4966-a120-bb2686691841'::uuid, 'p13', 'ollie', '10/10 would boop again', 31, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'ollie' and text = '10/10 would boop again');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '82156907-0d37-41a7-9031-c00a724c57b7'::uuid, 'p13', 'bigmac', 'Sending biscuits your way 🍪', 38, now() - interval '7 hours'
+select '99f5cf34-59f5-4154-a504-326fc58e0bb4'::uuid, 'p13', 'bigmac', 'Sending biscuits your way 🍪', 38, now() - interval '7 hours'
 where not exists (select 1 from public.comments where post_id = 'p13' and pet_id = 'bigmac' and text = 'Sending biscuits your way 🍪');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p14', 'bigmac', 'expo', 'hat', 'happy', '/photos/post-p14.jpg', array['/photos/post-p14.jpg', '/photos/post-p14-2.jpg', '/photos/post-p14-3.jpg']::text[], null, 'Brought a flower to the Pet Expo 🌷 Treat stand: located.', array['PetExpo', 'goldenretriever']::text[], 'Sydney Showground', 'first-expo', null, 3900, 48, 0, now() - interval '4 days')
@@ -328,16 +328,16 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'f4aed9be-5689-4d5c-ad28-aa68c01f56b6'::uuid, 'p14', 'pepper', 'Need this energy today', 9, now() - interval '1 hours'
+select 'b46ad13d-a4f9-4411-ac1b-317960a51cce'::uuid, 'p14', 'pepper', 'Need this energy today', 9, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p14' and pet_id = 'pepper' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '3a46b045-4ee0-4aaf-9022-c53516c93d7b'::uuid, 'p14', 'mochi', 'So cute!! 😍', 16, now() - interval '2 hours'
+select '2363dc4f-bc63-44da-9ede-6e15e1385dc3'::uuid, 'p14', 'mochi', 'So cute!! 😍', 16, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p14' and pet_id = 'mochi' and text = 'So cute!! 😍');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a6c9479b-2500-4422-ae9c-d446518e7d34'::uuid, 'p14', 'ollie', 'Iconic.', 23, now() - interval '3 hours'
+select '40423181-52fb-4071-865e-e7a3dfadde59'::uuid, 'p14', 'ollie', 'Iconic.', 23, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p14' and pet_id = 'ollie' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'f117cf5a-8370-41cc-8012-109cad1feb94'::uuid, 'p14', 'rex', 'Boop boop boop 🐾', 30, now() - interval '4 hours'
+select '88b9ee6c-48ff-4a8c-88cc-751aeff6df48'::uuid, 'p14', 'rex', 'Boop boop boop 🐾', 30, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p14' and pet_id = 'rex' and text = 'Boop boop boop 🐾');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p15', 'mochi', 'park', 'duck', 'happy', '/photos/post-p15.jpg', array['/photos/post-p15.jpg']::text[], null, 'Puppy throwback 🥹 Look how tiny I was', array['throwback', 'puppy']::text[], null, null, null, 18000, 260, 0, now() - interval '5 days')
@@ -345,22 +345,22 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '762b8b8e-c12f-4608-8cde-86c98b2d9cff'::uuid, 'p15', 'miso', 'The cutest thing on Floof today', 22, now() - interval '1 hours'
+select '9ce17893-7fe0-444c-b50c-3a2bbcb9d247'::uuid, 'p15', 'miso', 'The cutest thing on Floof today', 22, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'miso' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '83d4d794-1600-464b-9e35-837138440134'::uuid, 'p15', 'toby', 'Need this energy today', 29, now() - interval '2 hours'
+select 'f6b2b31c-2cd8-4d4c-9763-0399d72a23ba'::uuid, 'p15', 'toby', 'Need this energy today', 29, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'toby' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'df6666a4-77e0-4b0e-b718-a6aeda45267e'::uuid, 'p15', 'clover', 'So cute!! 😍', 36, now() - interval '3 hours'
+select '08d52be8-9eef-4121-b269-3f2c7e41c51a'::uuid, 'p15', 'clover', 'So cute!! 😍', 36, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'clover' and text = 'So cute!! 😍');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '4c28114d-1ee0-4168-8146-6afe815a3ee0'::uuid, 'p15', 'biscuit', 'Iconic.', 3, now() - interval '4 hours'
+select '5e6feb01-a74f-4517-9ebf-a033202353a3'::uuid, 'p15', 'biscuit', 'Iconic.', 3, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'biscuit' and text = 'Iconic.');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'c86f7733-d682-4e72-9783-230ea9127cde'::uuid, 'p15', 'peanut', 'Boop boop boop 🐾', 10, now() - interval '5 hours'
+select 'db79f17c-7dd4-4af4-8c3b-46216eb299f3'::uuid, 'p15', 'peanut', 'Boop boop boop 🐾', 10, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'peanut' and text = 'Boop boop boop 🐾');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '065540ee-097c-44e6-86b9-3e17dd2c422a'::uuid, 'p15', 'luna', 'Can we be friends?', 17, now() - interval '6 hours'
+select '0caa32c6-6f48-4090-bd67-1795c72ea1e0'::uuid, 'p15', 'luna', 'Can we be friends?', 17, now() - interval '6 hours'
 where not exists (select 1 from public.comments where post_id = 'p15' and pet_id = 'luna' and text = 'Can we be friends?');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p16', 'luna', 'blossom', 'none', 'smile', '/photos/post-p16.jpg', array['/photos/post-p16.jpg']::text[], null, 'Watching the birds. Planning. 🐦', array['catsofinstagram', 'windowcat']::text[], null, null, null, 11000, 120, 0, now() - interval '6 days')
@@ -368,13 +368,13 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '474ef464-bbb0-4f9e-98ca-3c4105a10dae'::uuid, 'p16', 'mochi', 'Look at that face 🥹', 35, now() - interval '1 hours'
+select '4f267c2c-b65f-439d-ba3c-03368f5b5226'::uuid, 'p16', 'mochi', 'Look at that face 🥹', 35, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p16' and pet_id = 'mochi' and text = 'Look at that face 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'a24cc381-5b26-4749-b473-0626f8a655bc'::uuid, 'p16', 'pepper', 'The cutest thing on Floof today', 2, now() - interval '2 hours'
+select '2fa4bc75-0c77-41b1-95dc-6ec95c7ac8b2'::uuid, 'p16', 'pepper', 'The cutest thing on Floof today', 2, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p16' and pet_id = 'pepper' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '93f15eba-ff76-4282-a5b3-8c2cde4bd558'::uuid, 'p16', 'bigmac', 'Need this energy today', 9, now() - interval '3 hours'
+select '197ce5e0-f4c5-44e2-b5d5-e684386d7f91'::uuid, 'p16', 'bigmac', 'Need this energy today', 9, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p16' and pet_id = 'bigmac' and text = 'Need this energy today');
 insert into public.posts (id, pet_id, scene, accessory, expression, image_url, image_urls, overlay, caption, tags, location, moment, slides, boops_base, biscuits_base, comments_base, created_at)
 values ('p17', 'bigmac', 'snow', 'bandana', 'happy', '/photos/post-p17.jpg', array['/photos/post-p17.jpg']::text[], null, 'Gotcha Day throwback! The day I came home 🏡', array['gotchaday', 'goldenretriever']::text[], null, 'gotcha-day', null, 5200, 73, 0, now() - interval '2 weeks')
@@ -382,19 +382,19 @@ on conflict (id) do update set image_url = excluded.image_url, image_urls = excl
   location = excluded.location, moment = excluded.moment
   where public.posts.pet_id in (select id from public.pets where owner_id is null);
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '80a0af98-1022-41cf-85fa-a43ec1b62b92'::uuid, 'p17', 'nala', 'My human would steal you instantly', 8, now() - interval '1 hours'
+select '3f5911e8-60bf-473c-84e8-6a99d6dd7bd5'::uuid, 'p17', 'nala', 'My human would steal you instantly', 8, now() - interval '1 hours'
 where not exists (select 1 from public.comments where post_id = 'p17' and pet_id = 'nala' and text = 'My human would steal you instantly');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '35a2540a-abf0-4fe6-8fd2-c9e755bf7737'::uuid, 'p17', 'miso', 'Look at that face 🥹', 15, now() - interval '2 hours'
+select 'b113b125-d1f6-4f1c-807d-496d21688cc8'::uuid, 'p17', 'miso', 'Look at that face 🥹', 15, now() - interval '2 hours'
 where not exists (select 1 from public.comments where post_id = 'p17' and pet_id = 'miso' and text = 'Look at that face 🥹');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '1f805057-b94c-494c-850b-025d950fe822'::uuid, 'p17', 'toby', 'The cutest thing on Floof today', 22, now() - interval '3 hours'
+select '82c72669-94b6-4dc8-a127-435874112880'::uuid, 'p17', 'toby', 'The cutest thing on Floof today', 22, now() - interval '3 hours'
 where not exists (select 1 from public.comments where post_id = 'p17' and pet_id = 'toby' and text = 'The cutest thing on Floof today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select '87ac41de-a1cd-4194-baf7-67cf897845bd'::uuid, 'p17', 'clover', 'Need this energy today', 29, now() - interval '4 hours'
+select '3fa7ef2c-5b53-4811-a2a5-c8c925624eeb'::uuid, 'p17', 'clover', 'Need this energy today', 29, now() - interval '4 hours'
 where not exists (select 1 from public.comments where post_id = 'p17' and pet_id = 'clover' and text = 'Need this energy today');
 insert into public.comments (id, post_id, pet_id, text, likes, created_at)
-select 'b6b4941b-df9d-47a3-a0f2-54d2012c9ab8'::uuid, 'p17', 'biscuit', 'So cute!! 😍', 36, now() - interval '5 hours'
+select '03d8a094-024d-4503-af7e-843a94c4f2fa'::uuid, 'p17', 'biscuit', 'So cute!! 😍', 36, now() - interval '5 hours'
 where not exists (select 1 from public.comments where post_id = 'p17' and pet_id = 'biscuit' and text = 'So cute!! 😍');
 
 -- House pets follow their friends (from AFFINITY).

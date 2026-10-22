@@ -98,7 +98,7 @@ export function PostCard({ post, full = false }: { post: Post; full?: boolean })
       )}
 
       <div className={`relative mx-3 select-none ${post.status === "rejected" ? "opacity-50" : ""}`} onClick={onMediaTap}>
-        <PostMedia post={post} pet={owner} carousel className="aspect-square rounded-[1.6rem]" />
+        <PostMedia post={post} pet={owner} carousel className={`${post.aspect === "portrait" ? "aspect-[4/5]" : "aspect-square"} rounded-[1.6rem]`} />
         {burst > 0 && (
           <span key={burst} className="animate-float-up pointer-events-none absolute left-1/2 top-1/2 -ml-10 -mt-10 text-white drop-shadow-lg">
             <PawIcon size={80} />

@@ -3,7 +3,8 @@
 import { sb } from "./supabase";
 import { timeAgo } from "./data";
 import { addDays, dayKey } from "./daily";
-import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Notification, Pet, Playdate, Post, Reminder, Sticker, Story, Thread, Weight } from "./types";
+import { makeThumb } from "./photo";
+import type { Clan, Collection, Comment, LedgerEntry, LostAlert, MomentType, Note, Notification, Pet, Playdate, Post, Reminder, Sticker, Story, Thread, Weight } from "./types";
 
 /* ---------------- Row → app model mapping ---------------- */
 
@@ -53,6 +54,7 @@ type PostRow = {
   frame: string | null;
   stickers: Sticker[] | null;
   edited_at: string | null;
+  aspect?: "square" | "portrait" | null;
   created_at: string;
   boop_count: number;
   comment_count: number;
@@ -103,6 +105,8 @@ export type Snapshot = {
   myPets: string[]; // pets this account owns or helps manage
   mine: {
     commentLikes: Record<string, true>;
+    unlocks: Record<string, true>;
+    notes: Note[];
     collections: Collection[];
     pawFivesSent: Record<string, string>; // pet -> last day I paw-fived them
     playdates: Playdate[];
@@ -307,7 +311,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     ];
 
     const myStoryIds = stories.filter((s) => s.petId === myPetId).map((s) => s.id);
-    const [myLikes, cols, colItems, pawRows, playRows, reactRows, seenRows, viewerRows, memberCount] = (await Promise.all([
+    const [myLikes, cols, colItems, pawRows, playRows, reactRows, seenRows, viewerRows, memberCount, unlockRows, noteRows] = (await Promise.all([
       db.from("comment_likes").select("comment_id").eq("pet_id", myPetId),
       db.from("collections").select("*").eq("pet_id", myPetId).order("created_at"),
       db.from("collection_items").select("collection_id, post_id, collections!inner(pet_id)").eq("collections.pet_id", myPetId),
@@ -317,6 +321,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
       db.from("story_views").select("story_id").eq("viewer_id", myPetId),
       myStoryIds.length ? db.from("story_views").select("story_id, viewer_id").in("story_id", myStoryIds) : Promise.resolve({ data: [], error: null }),
       db.from("pet_members").select("user_id").eq("pet_id", myPetId),
+      db.from("shop_unlocks").select("item").eq("pet_id", myPetId),
+      db.from("pet_notes").select("*").eq("pet_id", myPetId).order("updated_at", { ascending: false }),
     ]).then((r) => r.map(soft))) as [
       { comment_id: string }[],
       { id: string; name: string }[],
@@ -327,6 +333,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
       { story_id: string }[],
       { story_id: string; viewer_id: string }[],
       { user_id: string }[],
+      { item: string }[],
+      { id: string; title: string; body: string; pinned: boolean; updated_at: string }[],
     ];
     const reactionsByMsg: Record<string, Record<string, string>> = {};
     for (const r of reactRows) (reactionsByMsg[r.message_id] ??= {})[r.pet_id] = r.emoji;
@@ -354,6 +362,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     const led: LedgerEntry[] = [];
     for (const l of ledger) {
       if (l.kind === "welcome" || l.kind === "topup") balance += l.amount;
+      if (l.kind === "shop") balance -= l.amount;
       if (l.kind === "sent") {
         balance -= l.amount;
         if (l.counterparty_id) bump(interactions, l.counterparty_id, 5 * l.amount);
@@ -397,6 +406,8 @@ export async function loadSnapshot(): Promise<Snapshot> {
 
     mine = {
       commentLikes: Object.fromEntries(myLikes.map((l) => [l.comment_id, true as const])),
+      unlocks: Object.fromEntries(unlockRows.map((u) => [u.item, true as const])),
+      notes: noteRows.map((n) => ({ id: n.id, title: n.title, body: n.body, pinned: n.pinned, updatedAt: Date.parse(n.updated_at) })),
       collections: cols.map((c) => ({ id: c.id, name: c.name, postIds: colItems.filter((i) => i.collection_id === c.id).map((i) => i.post_id) })),
       pawFivesSent,
       playdates: playRows.map((p) => ({ id: p.id, fromPet: p.from_pet, toPet: p.to_pet, place: p.place, startsAt: Date.parse(p.starts_at), note: p.note, status: p.status })),
@@ -445,6 +456,7 @@ export async function loadSnapshot(): Promise<Snapshot> {
     dailyDate: r.daily_date ?? undefined,
     taggedPets: r.tagged_pets?.length ? r.tagged_pets : undefined,
     frame: r.frame ?? undefined,
+    aspect: r.aspect === "portrait" ? "portrait" : undefined,
     stickers: r.stickers?.length ? r.stickers : undefined,
     editedAt: r.edited_at ? Date.parse(r.edited_at) : undefined,
     boops: r.boop_count - (myBoops.has(r.id) ? 1 : 0),
@@ -512,13 +524,17 @@ function dataUrlToBlob(dataUrl: string) {
 }
 
 /** Upload a data URL photo to the public "media" bucket and return its URL. */
-export async function uploadPhoto(dataUrl: string, name: string) {
+export async function uploadPhoto(dataUrl: string, name: string, thumb?: string) {
   const db = sb();
   const { data: auth } = await db.auth.getSession();
   const uid = auth.session?.user.id;
   if (!uid) throw new Error("Please log in first");
-  const path = `${uid}/${name}-${Date.now().toString(36)}.jpg`;
-  must(await db.storage.from("media").upload(path, dataUrlToBlob(dataUrl), { contentType: "image/jpeg", upsert: false }));
+  const base = `${uid}/${name}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  // Photos with a small copy are named *.f.jpg / *.t.jpg so grids can load the small one (see thumbOf).
+  const path = thumb ? `${base}.f.jpg` : `${base}.jpg`;
+  const opts = { contentType: "image/jpeg", upsert: false, cacheControl: "31536000" };
+  must(await db.storage.from("media").upload(path, dataUrlToBlob(dataUrl), opts));
+  if (thumb) must(await db.storage.from("media").upload(`${base}.t.jpg`, dataUrlToBlob(thumb), opts));
   return db.storage.from("media").getPublicUrl(path).data.publicUrl;
 }
 
@@ -610,6 +626,15 @@ export const remote = {
   },
   async deleteReminder(id: string) {
     check(await sb().from("reminders").delete().eq("id", id));
+  },
+  async unlock(pet: string, item: string) {
+    check(await sb().rpc("buy_shop_item", { p_pet: pet, p_item: item }));
+  },
+  async saveNote(pet: string, n: Note) {
+    check(await sb().from("pet_notes").upsert({ id: n.id, pet_id: pet, title: n.title, body: n.body, pinned: n.pinned }));
+  },
+  async deleteNote(id: string) {
+    check(await sb().from("pet_notes").delete().eq("id", id));
   },
   async addWeight(pet: string, w: Weight) {
     check(await sb().from("pet_weights").insert({ id: w.id, pet_id: pet, measured_on: w.date, kg: w.kg }));
@@ -705,7 +730,9 @@ export const remote = {
   },
   async post(p: Post) {
     const all = p.images?.length ? p.images : p.image ? [p.image] : [];
-    const urls = await Promise.all(all.map((src, i) => (src.startsWith("data:") ? uploadPhoto(src, `post-${i + 1}`) : Promise.resolve(src))));
+    const urls = await Promise.all(
+      all.map(async (src, i) => (src.startsWith("data:") ? uploadPhoto(src, `post-${i + 1}`, await makeThumb(src)) : src)),
+    );
     const image = urls[0];
     check(
       await sb().from("posts").insert({
@@ -725,6 +752,7 @@ export const remote = {
         ...(p.taggedPets?.length ? { tagged_pets: p.taggedPets } : {}),
         ...(p.frame ? { frame: p.frame } : {}),
         ...(p.stickers?.length ? { stickers: p.stickers } : {}),
+        ...(p.aspect === "portrait" ? { aspect: "portrait" } : {}),
       }),
     );
   },

@@ -210,7 +210,7 @@ function MessageBody({ text, at, mine }: { text: string; at: string; mine: boole
           <PetAvatar pet={owner} size={24} />
           <span className="truncate text-xs font-extrabold">{owner.handle}</span>
         </div>
-        <PostMedia post={shared} pet={owner} className="aspect-square" />
+        <PostMedia post={shared} pet={owner} className="aspect-square" hd />
         <p className="line-clamp-2 px-3 py-2 text-xs font-semibold">{shared.caption}</p>
       </Link>
       {words && <p className="whitespace-pre-line break-words px-2.5 pb-1 pt-2">{words}</p>}

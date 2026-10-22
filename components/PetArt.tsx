@@ -1,3 +1,5 @@
+import { SHOP } from "@/lib/shop";
+import { thumbOf } from "@/lib/photo";
 import { useId, useState } from "react";
 import type { Accessory, Expression, Pet, Scene, Sticker } from "@/lib/types";
 
@@ -570,6 +572,12 @@ export const FRAMES: { id: string; label: string }[] = [
 
 export const STICKERS = ["💖", "🐾", "⭐", "🎀", "👑", "🦴", "🎾", "🌸", "😎", "💬", "🔥", "🍪", "🎉", "🌈", "😴", "🧸"];
 
+/** Free frames plus the Biscuit Shop ones (which need unlocking). */
+export const ALL_FRAMES: { id: string; label: string; item?: string }[] = [
+  ...FRAMES,
+  ...SHOP.filter((i) => i.kind === "frame").map((i) => ({ id: i.id.slice(6), label: `${i.emoji} ${i.name}`, item: i.id })),
+];
+
 /** Decorations drawn on top of a photo: a frame and draggable emoji stickers (positions in %). */
 export function Decorations({ frame, stickers, onStickerPointerDown }: { frame?: string; stickers?: Sticker[]; onStickerPointerDown?: (i: number, e: React.PointerEvent) => void }) {
   return (
@@ -584,6 +592,33 @@ export function Decorations({ frame, stickers, onStickerPointerDown }: { frame?:
           <span className="pointer-events-none absolute left-[4%] top-[3%] text-[11cqw]">🎈</span>
         </>
       )}
+      {frame === "neon" && (
+        <div className="pointer-events-none absolute inset-0 border-[2.2cqw] border-[#FF4FA0]" style={{ boxShadow: "inset 0 0 5cqw rgba(255,79,160,.75), inset 0 0 0 0.6cqw #fff" }} />
+      )}
+      {frame === "rainbow" && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ borderWidth: "3.2cqw", borderStyle: "solid", borderImage: "linear-gradient(135deg,#FF6B6B,#FFB84D,#FFE45E,#6BCB77,#4D96FF,#B07CFF) 1" }}
+        />
+      )}
+      {frame === "film" && (
+        <>
+          {["top-0", "bottom-0"].map((pos) => (
+            <div key={pos} className={`pointer-events-none absolute inset-x-0 ${pos} flex h-[10cqw] items-center bg-[#1b1412]`}>
+              <div className="h-[3.4cqw] w-full" style={{ background: "repeating-linear-gradient(90deg, transparent 0 2.6cqw, #f4ece0 2.6cqw 5.6cqw)" }} />
+            </div>
+          ))}
+        </>
+      )}
+      {frame === "royal" && (
+        <>
+          <div className="pointer-events-none absolute inset-0 border-[3cqw] border-[#5B2E8C]" style={{ boxShadow: "inset 0 0 0 1cqw #E9C46A" }} />
+          <span className="pointer-events-none absolute left-1/2 top-[0.5cqw] -translate-x-1/2 text-[11cqw] leading-none drop-shadow">👑</span>
+        </>
+      )}
+      {frame === "stars" && <EdgeEmoji emoji="✨" />}
+      {frame === "bones" && <EdgeEmoji emoji="🦴" />}
+      {frame === "blossom" && <EdgeEmoji emoji="🌸" />}
       {frame === "home" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-cocoa/80 to-transparent px-[5cqw] pb-[4cqw] pt-[10cqw] text-center font-hand text-[9cqw] leading-none text-white">
           First Day Home 🏡
@@ -629,17 +664,22 @@ export function PostMedia({
   pet,
   className = "",
   carousel = false,
+  hd = false,
 }: {
   post: MediaPost;
   pet: Pet;
   className?: string;
   /** Swipeable photos with a counter. Off for thumbnails, which show the cover only. */
   carousel?: boolean;
+  /** Load the full-size photo even when not a carousel (big displays). */
+  hd?: boolean;
 }) {
   const [broken, setBroken] = useState<string | null>(null);
+  const [noThumb, setNoThumb] = useState(false);
   const photos = photosOf(post);
-  const cover = photos[0];
   const multi = photos.length > 1;
+  // Grids and previews load the small copy of a photo when there is one.
+  const cover = photos[0] && !carousel && !hd && !noThumb ? thumbOf(photos[0]) : photos[0];
 
   const overlay = post.overlay && (
     <span className="pointer-events-none absolute right-4 top-11 max-w-[60%] rotate-[-6deg] text-right font-hand text-3xl leading-tight text-white [text-shadow:0_0_2px_#4a2e22,0_1px_2px_#4a2e22,0_2px_8px_rgba(74,46,34,.6)]">
@@ -653,7 +693,14 @@ export function PostMedia({
     <div className={`relative overflow-hidden bg-sand ${className}`} style={{ containerType: "inline-size" }}>
       {cover && broken !== cover ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={cover} alt="" loading="lazy" onError={() => setBroken(cover)} className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={cover}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => (cover !== photos[0] ? setNoThumb(true) : setBroken(cover))}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
       ) : (
         <PetScene pet={pet} scene={post.scene} accessory={post.accessory} expression={post.expression} className="absolute inset-0 h-full w-full" />
       )}
@@ -698,6 +745,7 @@ function Carousel({ photos, overlay, className, post }: { photos: string[]; over
             src={src}
             alt={`Photo ${i + 1} of ${photos.length}`}
             loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
             draggable={false}
             className="h-full w-full shrink-0 snap-center object-cover"
           />

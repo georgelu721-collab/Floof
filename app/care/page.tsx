@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { dayKey, daysBetween, fromKey } from "@/lib/daily";
-import { newId, useStore } from "@/lib/store";
-import type { Post, Reminder } from "@/lib/types";
+import { newId, newUuid, useStore } from "@/lib/store";
+import type { Note, Post, Reminder } from "@/lib/types";
 import { PostMedia } from "@/components/PetArt";
 import { Page, SectionTitle, TopBar } from "@/components/Shell";
 import { IconCheck, IconX } from "@/components/Icons";
+import { Sheet } from "@/components/Sheet";
+import { timeAgo } from "@/lib/data";
 
 const KINDS: { kind: Reminder["kind"]; label: string; emoji: string; repeat: Reminder["repeat"] }[] = [
   { kind: "flea", label: "Flea & tick", emoji: "🪲", repeat: "monthly" },
@@ -231,6 +233,8 @@ export default function Care() {
         )}
       </section>
 
+      <Notes />
+
       <SectionTitle>Memories</SectionTitle>
       {memories.length > 0 ? (
         <div className="no-scrollbar flex gap-3 overflow-x-auto px-4">
@@ -301,5 +305,118 @@ function WeightChart() {
         ))}
       </svg>
     </div>
+  );
+}
+
+const NOTE_IDEAS = ["🍽️ Food & feeding", "💊 Medication", "🩺 Vet notes", "🐾 Quirks & habits", "🏠 Pet-sitter instructions"];
+
+function Notes() {
+  const { s, me, dispatch } = useStore();
+  const [open, setOpen] = useState<Note | null>(null);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const notes = [...s.notes]
+    .filter((n) => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+  const blank = (title = ""): Note => ({ id: newUuid(), title, body: "", pinned: false, updatedAt: Date.now() });
+
+  return (
+    <>
+      <SectionTitle
+        action={
+          <button className="text-sm font-extrabold text-blush" onClick={() => setOpen(blank())}>
+            + New note
+          </button>
+        }
+      >
+        Notes
+      </SectionTitle>
+      <div className="space-y-2 px-4">
+        {s.notes.length > 3 && <input className="input !py-2 text-sm" placeholder="Search notes…" value={query} onChange={(e) => setQuery(e.target.value)} />}
+        {notes.map((n) => (
+          <button key={n.id} onClick={() => setOpen(n)} className="card block w-full p-3.5 text-left">
+            <p className="flex items-center gap-1.5 font-extrabold">
+              {n.pinned && <span aria-label="Pinned">📌</span>}
+              <span className="truncate">{n.title || "Untitled note"}</span>
+            </p>
+            {n.body && <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-cocoa-soft">{n.body}</p>}
+            <p className="mt-1 text-[11px] font-bold text-muted">Edited {timeAgo(n.updatedAt)}</p>
+          </button>
+        ))}
+        {s.notes.length === 0 && (
+          <div className="card p-4">
+            <p className="text-sm font-semibold text-muted">Keep everything about {me.name} in one place. Start with:</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {NOTE_IDEAS.map((t) => (
+                <button key={t} className="chip" onClick={() => setOpen(blank(t))}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {s.notes.length > 0 && notes.length === 0 && <p className="py-2 text-center text-sm font-semibold text-muted">No notes match “{query}”</p>}
+      </div>
+      {open && (
+        <NoteSheet
+          note={open}
+          isNew={!s.notes.some((n) => n.id === open.id)}
+          onClose={() => setOpen(null)}
+          onSave={(n) => void dispatch({ t: "saveNote", note: { ...n, updatedAt: Date.now() } })}
+          onDelete={() => void dispatch({ t: "deleteNote", id: open.id })}
+        />
+      )}
+    </>
+  );
+}
+
+function NoteSheet({ note, isNew, onClose, onSave, onDelete }: { note: Note; isNew: boolean; onClose: () => void; onSave: (n: Note) => void; onDelete: () => void }) {
+  const [title, setTitle] = useState(note.title);
+  const [body, setBody] = useState(note.body);
+  const [pinned, setPinned] = useState(note.pinned);
+  const changed = title !== note.title || body !== note.body || pinned !== note.pinned;
+  const empty = !title.trim() && !body.trim();
+
+  const close = () => {
+    if (changed && !empty) onSave({ ...note, title: title.trim(), body: body.trimEnd(), pinned });
+    onClose();
+  };
+
+  return (
+    <Sheet title={isNew ? "New note" : "Note"} onClose={close}>
+      <div className="space-y-2">
+        <input className="input font-extrabold" placeholder="Title" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <textarea
+          className="input min-h-56 !rounded-3xl leading-relaxed"
+          placeholder="Write anything: feeding amounts, medication doses, the vet's advice, what the pet-sitter needs to know…"
+          maxLength={4000}
+          value={body}
+          autoFocus={isNew}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <p className="text-right text-[11px] font-bold text-muted">{body.length}/4000</p>
+        <div className="grid grid-cols-[auto_1fr] gap-2">
+          <button className="btn btn-soft !px-4" onClick={() => setPinned((p) => !p)} aria-pressed={pinned}>
+            {pinned ? "📌 Pinned" : "📍 Pin"}
+          </button>
+          <button className="btn btn-dark" disabled={empty} onClick={close}>
+            Save note
+          </button>
+        </div>
+        {!isNew && (
+          <button
+            className="btn w-full !text-blush"
+            onClick={() => {
+              if (!confirm("Delete this note?")) return;
+              onDelete();
+              onClose();
+            }}
+          >
+            Delete note
+          </button>
+        )}
+        <p className="text-center text-[11px] font-semibold text-muted">Notes are private to you and family members who help with this pet.</p>
+      </div>
+    </Sheet>
   );
 }

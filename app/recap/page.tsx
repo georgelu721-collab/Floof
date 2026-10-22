@@ -91,7 +91,7 @@ export default function RecapPage() {
             <>
               <SectionTitle>Top floof this week</SectionTitle>
               <Link href={`/post/${top.id}`} className="card mx-4 block overflow-hidden">
-                <PostMedia post={top} pet={pet(top.petId)!} className="aspect-[4/3]" />
+                <PostMedia post={top} pet={pet(top.petId)!} className="aspect-[4/3]" hd />
                 <p className="truncate px-4 py-3 text-sm font-bold">{top.caption}</p>
               </Link>
             </>

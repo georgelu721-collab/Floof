@@ -145,7 +145,7 @@ export default function StoryViewer() {
             </div>
           )
         ) : (
-          <PostMedia post={{ ...item.post, overlay: undefined }} pet={p} className="h-full w-full" />
+          <PostMedia post={{ ...item.post, overlay: undefined }} pet={p} className="h-full w-full" hd />
         )}
       </div>
 

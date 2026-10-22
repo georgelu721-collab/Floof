@@ -169,7 +169,7 @@ export default function Profile() {
             <Link href="/settings/profile" className="btn btn-soft w-full !py-2.5">
               Edit profile
             </Link>
-            <div className="grid grid-cols-5 gap-1.5 text-center text-[11px] font-extrabold">
+            <div className="grid grid-cols-6 gap-1.5 text-center text-[11px] font-extrabold">
               <Link href="/wallet" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
                 <BiscuitIcon size={20} /> {pet.biscuitsReceived}
               </Link>
@@ -183,7 +183,10 @@ export default function Profile() {
                 <span className="text-lg leading-5">📊</span> Recap
               </Link>
               <Link href="/playdates" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
-                <span className="text-lg leading-5">🎾</span> Playdates
+                <span className="text-lg leading-5">🎾</span> Play
+              </Link>
+              <Link href="/shop" className="flex flex-col items-center gap-0.5 rounded-2xl bg-sand py-2">
+                <span className="text-lg leading-5">🛍️</span> Shop
               </Link>
             </div>
           </div>
